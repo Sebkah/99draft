@@ -1,3 +1,5 @@
+import { get } from 'http';
+
 /**
  * Represents a single, contiguous piece of text from one of the buffers.
  */
@@ -50,6 +52,7 @@ export class PieceTable {
   constructor(originalContent: string) {
     this.originalBuffer = originalContent;
     this.addBuffer = '';
+
     this._length = originalContent.length;
 
     // The initial state is a single piece spanning the entire original buffer.
@@ -116,8 +119,7 @@ export class PieceTable {
 
     console.log('Add buffer length before insert:', this._addBufferLength);
 
-    // Calculate the length of the text counting escape sequences.
-    const lengthWithEscapes = text.length;
+    const lengthWithEscapes = getTextLengthWithEscapes(text);
 
     // 1. Append the new text to the 'add' buffer and create a piece for it.
     this.addBuffer += text;
@@ -234,13 +236,19 @@ export class PieceTable {
     let currentPos = 0;
     for (let i = 0; i < this.pieces.length; i++) {
       const piece = this.pieces[i];
+
       if (position >= currentPos && position <= currentPos + piece.length) {
+        // Check how many line breaks are before the position
+        const offsetInPiece = position - currentPos;
+
+        // Return the piece index and the offset within that piece
+
         return {
           pieceIndex: i,
-          offsetInPiece: position - currentPos,
+          offsetInPiece: offsetInPiece,
         };
       }
-      currentPos += piece.length;
+      currentPos += piece.length; // Adjust for line breaks
     }
 
     // Should only happen if position === this.length and the last piece has length > 0
@@ -253,4 +261,10 @@ export class PieceTable {
 
     return { pieceIndex: -1, offsetInPiece: 0 }; // Not found (e.g., empty doc)
   }
+}
+
+export function getTextLengthWithEscapes(text: string): number {
+  // Count the number of escaped characters (e.g., \n, \r)
+  const numberOfEscapedCharacters = (text.match(/[\n\r]/g) || []).length;
+  return text.length + numberOfEscapedCharacters; // Return length including escapes
 }

@@ -13,20 +13,15 @@ type PieceDebug = {
 const Canvas = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
-  const [pieceTable, setPieceTable] = useState<PieceTable | null>(null);
+  const [pieceTable] = useState<PieceTable>(
+    new PieceTable(
+      'Hello\n world!\n This is a piece table example.\nYou can insert and delete text efficiently using this structure. \n Piece tables are great for text editors and similar applications. END OF ORIGINAL TEXT',
+    ),
+  );
   const [textRenderer, setTextRenderer] = useState<TextRenderer | null>(null);
   const [pieces, setPieces] = useState<PieceDebug[]>([]);
 
-  const cursorPosition = useRef(0);
-
-  useEffect(() => {
-    const _pieceTable = new PieceTable(
-      'Hello world! This is a piece table example. \nYou can insert and delete text efficiently using this structure. \n\nPiece tables are great for text editors and similar applications. END OF ORIGINAL TEXT',
-    );
-    setPieceTable(_pieceTable);
-
-    cursorPosition.current = _pieceTable.length - 1; // Set initial cursor position to the end of the original text
-  }, []);
+  const cursorPosition = useRef(0); // Start at the end of the original text
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -109,7 +104,7 @@ const Canvas = () => {
       }
 
       // Handle other printable characters
-      pieceTable.insert(event.key, Math.floor(cursorPosition.current));
+      pieceTable.insert(event.key, cursorPosition.current);
       cursorPosition.current = Math.max(0, cursorPosition.current + 1); // Move cursor right for the new character
       draw();
       event.preventDefault();
@@ -121,7 +116,9 @@ const Canvas = () => {
       <canvas
         ref={canvasRef}
         tabIndex={0} // Make the canvas focusable
-        width={600}
+        // Make the canvas focussed by default
+        autoFocus
+        width={1000}
         height={400}
         onKeyDown={handleKeyDown}
         className="bg-white pointer-events-auto"
@@ -137,8 +134,11 @@ const Canvas = () => {
         <pre className="text-xs">
           {pieces.map((piece, index) => (
             <div key={index}>
-              <strong>Piece {index}:</strong> {piece.text} (Source: {piece.source}, Offset:{' '}
-              {piece.offset}, Length: {piece.length})
+              <strong>
+                Piece {index} (Source: {piece.source}, Offset: {piece.offset}, Length:{' '}
+                {piece.length}):
+              </strong>{' '}
+              {piece.text}
             </div>
           ))}
         </pre>

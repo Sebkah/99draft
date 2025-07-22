@@ -1,4 +1,3 @@
-import { is } from '@electron-toolkit/utils';
 import { PieceTable } from './PieceTable/PieceTable';
 
 type Paragraph = {
@@ -32,13 +31,13 @@ export class TextRenderer {
   }
 
   // Split the text into paragraphs based on newlines
-
   private splitIntoParagraphs(): void {
     const pieces = this._pieceTable.getPieces();
 
     this.paragraphs = []; // Reset paragraphs for each render
     let currentOffset = 0;
 
+    // Iterate over the pieces
     for (let i = 0; i < pieces.length; i++) {
       const piece = pieces[i];
       const text =
@@ -46,61 +45,44 @@ export class TextRenderer {
           ? this._pieceTable.originalBuffer.substring(piece.offset, piece.offset + piece.length)
           : this._pieceTable.addBuffer.substring(piece.offset, piece.offset + piece.length);
 
+      // Split the text into paragraphs based on newlines
       const newParagraphs = text.split('\n');
 
-      // If this is the first piece, initialize paragraphs
+      // If this is the first piece, add all paragraphs directly and continue to next piece
       if (i === 0) {
-        newParagraphs.forEach((line, index) => {
-          const isLastParagraph = index === newParagraphs.length - 1;
-          const addBreakLength = isLastParagraph ? 0 : 1; // No newline for the last paragraph
-          // If the line is empty, we still need to add it as a paragraph
-          if (line === '') {
-            this.paragraphs.push({
-              text: '',
-              dirty: false,
-              offset: currentOffset,
-              length: addBreakLength, // +1 for the newline character
-              lines: [],
-            });
-            currentOffset += addBreakLength; // +1 for the newline character
-            return;
-          }
+        newParagraphs.forEach((p) => {
           this.paragraphs.push({
-            text: line,
+            text: p,
             dirty: false,
             offset: currentOffset,
-            length: line.length + addBreakLength, // +1 for the newline character
+            length: p.length + 1, // Include the newline character
             lines: [],
           });
-          currentOffset += line.length + addBreakLength; // +1 for the newline character
+          currentOffset += p.length + 1; // Include the newline character
         });
         continue;
       }
 
-      // Add the first paragraph of the piece to the last paragraph
-      if (this.paragraphs.length > 0) {
-        const lastParagraph = this.paragraphs[this.paragraphs.length - 1];
-        lastParagraph.text += newParagraphs[0];
+      // If this is not the first piece, append the first paragraph to the last paragraph
+      // and add the rest as new paragraphs
+      const lastParagraph = this.paragraphs[this.paragraphs.length - 1];
+      lastParagraph.text += newParagraphs[0];
 
-        lastParagraph.dirty = true; // Mark as dirty since it has been modified
-        lastParagraph.length = lastParagraph.text.length;
+      lastParagraph.dirty = true; // Mark as dirty since it has been modified
+      lastParagraph.length = lastParagraph.text.length + 1; // Include the newline character
 
-        currentOffset += newParagraphs[0].length; // +1 for the newline character
-      }
+      currentOffset += newParagraphs[0].length; // No need to include the newline character here, as it is already included in the last paragraph's length
 
       // Add the rest of the paragraphs as new paragraphs
       for (let j = 1; j < newParagraphs.length; j++) {
-        const isLastParagraph = j === newParagraphs.length - 1;
-        const addBreakLength = isLastParagraph ? 0 : 1; // No newline for the last paragraph
-
         this.paragraphs.push({
           text: newParagraphs[j],
           offset: currentOffset,
-          length: newParagraphs[j].length + addBreakLength, // +1 for the newline character
+          length: newParagraphs[j].length + 1, // Include the newline character
           dirty: false,
           lines: [],
         });
-        currentOffset += newParagraphs[j].length + addBreakLength; // +1 for the newline character
+        currentOffset += newParagraphs[j].length + 1; // Include the newline character
       }
     }
   }
@@ -157,6 +139,7 @@ export class TextRenderer {
   }
 
   // Split a paragraph into lines based on the canvas width
+  /// TODO: still no working
   private splitIntoLines(paragraph: Paragraph, maxWidth: number): void {
     const words = paragraph.text.split(' ');
     let currentLine = '';
@@ -165,17 +148,25 @@ export class TextRenderer {
     let offsetInParagraph = paragraph.offset;
 
     words.forEach((word) => {
-      const testLine = currentLine + (currentLine.length ? ' ' : '') + word; // Add a space if currentLine is not empty
+      // Handle if the word is whitespace
+      const wordOrWhitespace = word.length === 0 ? ' ' : word;
+
+      // If we're not at the start of the line, add a space before the word
+      const testLine =
+        currentLine +
+        (currentLine.length === 0 ? '' : word.length === 0 ? '' : ' ') +
+        wordOrWhitespace;
+
       const metrics = this.ctx.measureText(testLine);
 
       if (metrics.width > maxWidth && currentLine) {
         paragraph.lines.push({
           text: currentLine,
           offset: offsetInParagraph,
-          length: currentLine.length,
+          length: currentLine.length + 1, // Include the space character
         });
-        offsetInParagraph += currentLine.length; // +1 for the space between words
-        currentLine = word;
+        offsetInParagraph += currentLine.length + 1; // Include the space character
+        currentLine = wordOrWhitespace; // Start a new line with the current word
       } else {
         currentLine = testLine;
       }
@@ -186,7 +177,7 @@ export class TextRenderer {
       paragraph.lines.push({
         text: currentLine,
         offset: offsetInParagraph,
-        length: currentLine.length,
+        length: currentLine.length + 1, // Include the space character
       });
     }
   }
@@ -197,18 +188,27 @@ export class TextRenderer {
   }
 
   public render(cursorPosition: number): void {
+    const leftMargin = 150; // Left margin for the text
+    const lineHeight = 20; // Height of each line
     this.ctx.clearRect(0, 0, this.ctx.canvas.width, this.ctx.canvas.height);
 
     this.splitIntoParagraphs();
     console.log('Rendering text at cursor position:', cursorPosition, this._renderedCursorPosition);
     this.paragraphs.forEach((paragraph) => {
-      this.splitIntoLines(paragraph, 500); // Assuming a max width of 780px for the canvas
+      this.splitIntoLines(paragraph, 600); // Assuming a max width of 780px for the canvas
     });
-    this.mapCursorPosition(cursorPosition - 1);
+    this.mapCursorPosition(cursorPosition);
 
     this.ctx.save();
 
     this.paragraphs.forEach((paragraph, pindex) => {
+      this.ctx.fillStyle = 'blue';
+      this.ctx.font = '12px Arial';
+      this.ctx.fillText(
+        `Paragraph ${pindex} - offset ${paragraph.offset} - length ${paragraph.length}`,
+        800,
+        lineHeight,
+      );
       paragraph.lines.forEach((line, lindex) => {
         this.ctx.font = '16px Arial'; // Reset font in case it was changed
         this.ctx.fillStyle = 'black'; // Default text color
@@ -222,23 +222,29 @@ export class TextRenderer {
         ) {
           this.ctx.fillStyle = 'blue'; // Highlight the line with the cursor
           this.ctx.fillRect(
-            this._renderedCursorPosition[2] + 80,
+            this._renderedCursorPosition[2] + leftMargin,
             0,
             2, // Cursor width
-            20, // Line height
+            lineHeight,
           );
         }
 
-        this.ctx.translate(0, 20);
-        this.renderLine(line.text, 80, 0);
+        this.ctx.translate(0, lineHeight);
+        this.renderLine(line.text, leftMargin, 0);
 
         // Render line length debug info
-        this.ctx.fillStyle = 'red';
+        this.ctx.fillStyle = 'blue';
         this.ctx.font = '12px Arial';
-        this.ctx.fillText(`o ${line.offset}`, 10, 0);
-        this.ctx.fillText(`l ${line.length}`, 50, 0);
+        this.ctx.fillText(`offset ${line.offset}`, 10, 0);
+        this.ctx.fillText(`length ${line.length}`, 80, 0);
       });
     });
+
+    this.ctx.fillText(
+      `cursor Position i ${cursorPosition} - p ${this._renderedCursorPosition[0]} - l ${this._renderedCursorPosition[1]} - c ${this._renderedCursorPosition[2]}`,
+      800,
+      200,
+    );
 
     this.ctx.restore();
   }
