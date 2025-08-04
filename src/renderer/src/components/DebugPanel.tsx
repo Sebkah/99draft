@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { PieceTable } from '@renderer/Editor/PieceTable/PieceTable';
-import { TextRenderer } from '@renderer/Editor/RenderText';
+import { TextRenderer } from '@renderer/Editor/TextRenderer';
 import { motion } from 'framer-motion';
 
 /**
@@ -49,7 +49,7 @@ const DebugPanel: React.FC<DebugPanelProps> = ({
   };
 
   return (
-    <motion.div className="fixed bottom-2 right-2 w-80 max-h-80 overflow-auto bg-gray-900 text-white p-2 rounded-lg shadow-2xl z-50">
+    <motion.div className="fixed bottom-2 right-2 w-180 max-h-80 overflow-auto bg-gray-900 text-white p-2 rounded-lg shadow-2xl z-50">
       {/* Main panel header */}
       <div
         className="flex items-center gap-1 mb-2 cursor-pointer hover:bg-gray-800 rounded px-1 py-0.5 transition-colors"
@@ -147,8 +147,8 @@ const DebugPanel: React.FC<DebugPanelProps> = ({
               </div>
             </div>
             {!collapsedSections.buffer && (
-              <div className="bg-gray-900 rounded px-2 py-1 border border-yellow-400/20 font-mono text-xs overflow-hidden">
-                <div className="text-yellow-300 truncate max-w-full">
+              <div className="bg-gray-900 rounded px-2 py-1 border border-yellow-400/20 font-mono text-xs w-full overflow-y-auto">
+                <div className="text-yellow-300 ">
                   {pieceTable
                     ? pieceTable.addBuffer.replace(/[\n\r]/g, '\\n') || '<empty>'
                     : 'Loading...'}
@@ -194,7 +194,7 @@ const DebugPanel: React.FC<DebugPanelProps> = ({
                         </div>
                       </div>
                       <div className="font-mono text-xs text-gray-300 bg-gray-900 rounded p-1 border border-gray-600/30">
-                        "{piece.text.replace(/[\n\r]/g, '\\n')}"
+                        "{piece.text || '<empty>'}"
                       </div>
                     </div>
                   ))}

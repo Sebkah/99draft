@@ -1,10 +1,10 @@
 import { PieceTable } from '@renderer/Editor/PieceTable/PieceTable';
-import { TextRenderer } from '@renderer/Editor/RenderText';
+import { TextRenderer } from '@renderer/Editor/TextRenderer';
+import { InputManager } from '@renderer/Editor/InputManager';
 import DebugPanel from './DebugPanel';
 import Ruler from './Ruler';
 
-import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { text } from 'stream/consumers';
+import React, { useEffect, useRef, useState } from 'react';
 
 /**
  * Type definition for debugging piece table structure
@@ -26,28 +26,28 @@ const Canvas = () => {
   const cursorPosition = useRef<number>(0);
 
   // Initialize piece table with sample text
-  const [pieceTable] = useState<PieceTable>(
-    () =>
-      new PieceTable(
-        'Hello\n world!\n This is a piece   table example.\nYou can insert and delete text efficiently using this structure.\n Piece tables are great for text editors and similar applications. END OF ORIGINAL TEXT',
-      ),
-  );
+  const [pieceTable] = useState(() => {
+    const table = new PieceTable(
+      'Hello\n world!\n This is a piece   table example.\nYou can insert and delete text efficiently using this structure.\n Piece tables are great for text editors and similar applications. END OF ORIGINAL TEXT',
+    );
 
-  // State for text renderer and debug information
-  const [textRenderer, setTextRenderer] = useState<TextRenderer | null>(null);
-  const [piecesForDebug, setPieces] = useState<PieceDebug[]>([]);
+    // Set initial cursor position to end of text
+    cursorPosition.current = table.length;
 
-  // State for ruler margins
+    return table;
+  });
+
+  // Layout/rendering state
   const [leftMargin, setLeftMargin] = useState<number>(50);
   const [rightMargin, setRightMargin] = useState<number>(750);
 
-  // Set initial cursor position to end of text
-  useEffect(() => {
-    cursorPosition.current = pieceTable.length;
-  }, [pieceTable]);
+  // Initialize textRenderer and inputManager with lazy initialization
+  const [textRenderer, setTextRenderer] = useState<TextRenderer | null>(null);
+  const [inputManager, setInputManager] = useState<InputManager | null>(null);
+  const [piecesForDebug, setPieces] = useState<PieceDebug[]>([]);
 
   /**
-   * Initialize canvas context and text renderer
+   * Initialize canvas context, text renderer, and input manager
    * Also sets up debug information update interval
    */
   useEffect(() => {
@@ -55,12 +55,25 @@ const Canvas = () => {
     if (!canvas) return;
 
     const ctx = canvas.getContext('2d');
-    if (!ctx || !pieceTable) return;
+    if (!ctx) return;
 
-    // Initialize text renderer with canvas context
-    setTextRenderer(new TextRenderer(ctx, pieceTable));
+    // Initialize text renderer and input manager if not already created
+    if (!textRenderer || !inputManager) {
+      const renderer = new TextRenderer(ctx, pieceTable);
+      const manager = new InputManager(pieceTable, cursorPosition, renderer);
 
-    // Update debug information every second
+      setTextRenderer(renderer);
+      setInputManager(manager);
+
+      // Set initial margins and render
+      manager.updateMargins(leftMargin, rightMargin, canvas.width);
+    }
+
+    // Focus the canvas for keyboard input
+
+    canvas.focus();
+
+    // Update debug information
     const debugInterval = setInterval(() => {
       setPieces((prev) => {
         if (!pieceTable) return prev;
@@ -81,103 +94,49 @@ const Canvas = () => {
       });
     }, 100);
 
-    // Cleanup interval on unmount
-    return () => clearInterval(debugInterval);
-  }, [pieceTable]);
+    // Cleanup
+    return () => {
+      clearInterval(debugInterval);
+    };
+  }, [pieceTable, leftMargin, rightMargin, textRenderer, inputManager]);
 
-  /**
-   * Focus the canvas element after it's mounted and text renderer is ready
-   * This ensures the canvas receives keyboard input immediately
-   */
+  // Separate effect to handle margin updates
   useEffect(() => {
-    if (textRenderer && canvasRef.current) {
-      // Small delay to ensure the canvas is fully rendered
-      const focusTimeout = setTimeout(() => {
-        canvasRef.current?.focus();
-      }, 100);
-      textRenderer.leftMargin = leftMargin;
-      textRenderer.rightMargin = canvasRef.current.getContext('2d')?.canvas.width - rightMargin;
-
-      return () => clearTimeout(focusTimeout);
+    if (inputManager && canvasRef.current) {
+      inputManager.updateMargins(leftMargin, rightMargin, canvasRef.current.width);
     }
-
-    return; // Explicit return for linting
-  }, [textRenderer]);
-
-  useEffect(() => {
-    if (textRenderer && canvasRef.current) {
-      // Small delay to ensure the canvas is fully rendered
-
-      textRenderer.leftMargin = leftMargin;
-      textRenderer.rightMargin = canvasRef.current.getContext('2d')?.canvas.width - rightMargin;
-      // Ensure text renderer is updated with new margins
-      textRenderer.render(cursorPosition.current);
-    }
-    return;
-  }, [leftMargin, rightMargin, textRenderer]);
-
-  /**
-   * Renders the current text content and cursor position on the canvas
-   */
-  const draw = useCallback(() => {
-    const canvas = canvasRef.current;
-    if (!canvas || !pieceTable || !textRenderer) return;
-
-    const ctx = canvas.getContext('2d');
-    if (!ctx) throw new Error('Failed to get canvas context');
-
-    // Render text with current cursor position
-    textRenderer.render(cursorPosition.current);
-  }, [pieceTable, textRenderer]);
-
-  /**
-   * Initial render effect - draws content when text renderer is ready
-   */
-  useEffect(() => {
-    draw();
-  }, [draw]);
+  }, [leftMargin, rightMargin, inputManager]);
 
   /**
    * Handles keyboard input for text editing and cursor movement
    * @param event - React keyboard event from canvas element
    */
   const handleKeyDown = (event: React.KeyboardEvent<HTMLCanvasElement>) => {
-    if (!pieceTable || !textRenderer) return;
+    if (!inputManager) return;
 
-    // Handle Enter key - insert newline at end of text
-    if (event.key === 'Enter') {
-      pieceTable.insert('\n', cursorPosition.current);
-      cursorPosition.current += 1;
-      console.log('Inserted newline');
-      draw();
+    const handled = inputManager.handleKeyDown(event.nativeEvent);
+    if (handled) {
       event.preventDefault();
-      return;
     }
+  };
 
-    // Handle cursor movement
-    if (event.key === 'ArrowLeft') {
-      cursorPosition.current = Math.max(0, cursorPosition.current - 1);
-      draw();
-      event.preventDefault();
-      return;
+  /**
+   * Handles left margin changes from the ruler
+   */
+  const handleLeftMarginChange = (newLeftMargin: number) => {
+    setLeftMargin(newLeftMargin);
+    if (inputManager && canvasRef.current) {
+      inputManager.updateMargins(newLeftMargin, rightMargin, canvasRef.current.width);
     }
+  };
 
-    if (event.key === 'ArrowRight') {
-      cursorPosition.current = Math.min(pieceTable.length, cursorPosition.current + 1);
-      draw();
-      event.preventDefault();
-      return;
-    }
-
-    // Handle printable character input
-    if (event.key.length === 1 && !event.ctrlKey && !event.metaKey) {
-      console.log('Key pressed:', event.key);
-
-      // Insert character at current cursor position
-      pieceTable.insert(event.key, cursorPosition.current);
-      cursorPosition.current = Math.min(pieceTable.length, cursorPosition.current + 1);
-      draw();
-      event.preventDefault();
+  /**
+   * Handles right margin changes from the ruler
+   */
+  const handleRightMarginChange = (newRightMargin: number) => {
+    setRightMargin(newRightMargin);
+    if (inputManager && canvasRef.current) {
+      inputManager.updateMargins(leftMargin, newRightMargin, canvasRef.current.width);
     }
   };
 
@@ -186,16 +145,16 @@ const Canvas = () => {
       {/* Main text editor canvas */}
       <div className=" h-full">
         <Ruler
-          width={800}
+          width={1000}
           leftMargin={leftMargin}
           rightMargin={rightMargin}
-          onLeftMarginChange={setLeftMargin}
-          onRightMarginChange={setRightMargin}
+          onLeftMarginChange={handleLeftMarginChange}
+          onRightMarginChange={handleRightMarginChange}
         />
         <canvas
           ref={canvasRef}
           tabIndex={0} // Make canvas focusable for keyboard input
-          width={800}
+          width={1000}
           height={400}
           onKeyDown={handleKeyDown}
           className="bg-white pointer-events-auto shadow-lg focus:outline-none "

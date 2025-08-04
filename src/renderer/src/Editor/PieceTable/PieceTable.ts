@@ -1,5 +1,3 @@
-import { get } from 'http';
-
 /**
  * Represents a single, contiguous piece of text from one of the buffers.
  */
@@ -11,7 +9,7 @@ export interface Piece {
   readonly offset: number;
 
   /** The number of characters in the text segment. */
-  readonly length: number;
+  length: number;
 }
 export class PieceTable {
   // CORE PROPERTIES
@@ -42,6 +40,13 @@ export class PieceTable {
   private _length: number;
 
   private _addBufferLength: number = 0;
+
+  /**
+   * Version counter that increments with each modification.
+   * Used to track when the text has changed for optimizing parsing.
+   * @private
+   */
+  private _version: number = 0;
 
   // CONSTRUCTOR
 
@@ -76,6 +81,14 @@ export class PieceTable {
    */
   public get length(): number {
     return this._length;
+  }
+
+  /**
+   * Gets the current version of the document.
+   * Increments with each modification (insert/delete).
+   */
+  public getVersion(): number {
+    return this._version;
   }
 
   /**
@@ -119,7 +132,7 @@ export class PieceTable {
 
     console.log('Add buffer length before insert:', this._addBufferLength);
 
-    const lengthWithEscapes = getTextLengthWithEscapes(text);
+    const textLength = text.length;
 
     // 1. Append the new text to the 'add' buffer and create a piece for it.
     this.addBuffer += text;
@@ -127,7 +140,7 @@ export class PieceTable {
 
     console.log('New text offset:', newTextOffset);
 
-    const cursorAtEnd = position === this._length - 1; //TODO +1 -1 on the cursor position is fishy
+    const cursorAtEnd = position === this._length;
 
     // If inserting at the very end of the document
     if (cursorAtEnd) {
@@ -140,21 +153,24 @@ export class PieceTable {
         const newPiece: Piece = {
           source: 'add',
           offset, // Keep the original offset
-          length: length + lengthWithEscapes, // Extend the length
+          length: length + textLength, // Extend the length
         };
         // Replace the last piece with the new one.
         this.pieces[this.pieces.length - 1] = newPiece;
+        console.log('Extended last piece with new text');
       } else {
         // Otherwise, we create a new piece for the 'add' buffer.
         const newPiece: Piece = {
           source: 'add',
           offset: newTextOffset,
-          length: lengthWithEscapes,
+          length: textLength,
         };
         this.pieces.push(newPiece);
+        console.log('help');
       }
 
-      this.updateLength(lengthWithEscapes);
+      this.updateLength(textLength);
+      this._version++;
 
       return;
     }
@@ -162,7 +178,7 @@ export class PieceTable {
     const newPiece: Piece = {
       source: 'add',
       offset: newTextOffset,
-      length: lengthWithEscapes,
+      length: textLength,
     };
 
     // 2. Find the piece where the insertion occurs.
@@ -170,6 +186,17 @@ export class PieceTable {
 
     // 3. Split the existing piece and insert the new piece.
     const oldPiece = this.pieces[pieceIndex];
+
+    if (
+      oldPiece.source === 'add' && //If the piece is from the 'add' buffer
+      offsetInPiece === oldPiece.length && //If the insertion is at the end of the piece
+      oldPiece.offset + oldPiece.length === this._addBufferLength //If the piece maps to the end of the add buffer
+    ) {
+      oldPiece.length += textLength;
+      this.updateLength(textLength);
+      this._version++;
+      return;
+    }
 
     const before: Piece | null =
       offsetInPiece > 0
@@ -199,7 +226,10 @@ export class PieceTable {
     this.pieces.splice(pieceIndex, 1, ...replacement);
 
     // 5. Update the cached length.
-    this.updateLength(lengthWithEscapes);
+    this.updateLength(textLength);
+
+    // 6. Increment version to track changes
+    this._version++;
   }
 
   /**
@@ -219,6 +249,9 @@ export class PieceTable {
     console.log(
       `Delete operation from ${start} with count ${deleteCount} is not fully implemented in this outline.`,
     );
+
+    // Increment version to track changes (when delete is implemented)
+    this._version++;
   }
 
   // PRIVATE HELPER METHODS
@@ -261,11 +294,4 @@ export class PieceTable {
 
     return { pieceIndex: -1, offsetInPiece: 0 }; // Not found (e.g., empty doc)
   }
-}
-
-export function getTextLengthWithEscapes(text: string): number {
-  // Count the number of escaped characters (e.g., \n, \r)
-  const numberOfEscapedCharacters = (text.match(/[\n\r]/g) || []).length;
-  return text.length;
-  return text.length + numberOfEscapedCharacters; // Return length including escapes
 }
