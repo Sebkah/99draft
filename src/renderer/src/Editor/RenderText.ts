@@ -21,6 +21,42 @@ export class TextRenderer {
 
   private _pieceTable: PieceTable;
 
+  private _leftMargin: number = 100;
+  private _rightMargin: number = 100;
+
+  private _showDebugInfo: boolean = false;
+
+  // Getter for wrapping width
+  private get wrappingWidth(): number {
+    return this.ctx.canvas.width - this._leftMargin - this._rightMargin;
+  }
+
+  // Getters and setters for margins
+  public get leftMargin(): number {
+    return this._leftMargin;
+  }
+
+  public set leftMargin(margin: number) {
+    this._leftMargin = margin;
+  }
+
+  public get rightMargin(): number {
+    return this._rightMargin;
+  }
+
+  public set rightMargin(margin: number) {
+    this._rightMargin = margin;
+  }
+
+  // Getter and setter for debug info
+  public get showDebugInfo(): boolean {
+    return this._showDebugInfo;
+  }
+
+  public set showDebugInfo(show: boolean) {
+    this._showDebugInfo = show;
+  }
+
   private _renderedCursorPosition: [number, number, number] = [-1, -1, -1]; // [paragraphIndex, lineIndex, offsetInLineInPixels]
 
   constructor(ctx: CanvasRenderingContext2D, pieceTable: PieceTable) {
@@ -40,55 +76,65 @@ export class TextRenderer {
     // Iterate over the pieces
     for (let i = 0; i < pieces.length; i++) {
       const piece = pieces[i];
-      const text =
-        piece.source === 'original'
-          ? this._pieceTable.originalBuffer.substring(piece.offset, piece.offset + piece.length)
-          : this._pieceTable.addBuffer.substring(piece.offset, piece.offset + piece.length);
+      const text = this._pieceTable.getPieceText(piece);
 
-      // Split the text into paragraphs based on newlines
-      const newParagraphs = text.split('\n');
+      // Split while preserving newlines (when used with a regex, it keeps the newlines in the array)
+      const tokens = text.split(/(\n)/);
 
-      // If this is the first piece, add all paragraphs directly and continue to next piece
-      if (i === 0) {
-        newParagraphs.forEach((p) => {
+      tokens.forEach((token) => {
+        // If the token is a newline
+        if (token === '\n') {
+          // End current paragraph (length is already correct)
+          currentOffset += 1; // Account for newline
+          // Start a new empty paragraph
           this.paragraphs.push({
-            text: p,
-            dirty: false,
+            text: '',
+            dirty: true,
             offset: currentOffset,
-            length: p.length + 1, // Include the newline character
+            length: 0,
             lines: [],
           });
-          currentOffset += p.length + 1; // Include the newline character
-        });
-        continue;
-      }
-
-      // If this is not the first piece, append the first paragraph to the last paragraph
-      // and add the rest as new paragraphs
-      const lastParagraph = this.paragraphs[this.paragraphs.length - 1];
-      lastParagraph.text += newParagraphs[0];
-
-      lastParagraph.dirty = true; // Mark as dirty since it has been modified
-      lastParagraph.length = lastParagraph.text.length + 1; // Include the newline character
-
-      currentOffset += newParagraphs[0].length; // No need to include the newline character here, as it is already included in the last paragraph's length
-
-      // Add the rest of the paragraphs as new paragraphs
-      for (let j = 1; j < newParagraphs.length; j++) {
-        this.paragraphs.push({
-          text: newParagraphs[j],
-          offset: currentOffset,
-          length: newParagraphs[j].length + 1, // Include the newline character
-          dirty: false,
-          lines: [],
-        });
-        currentOffset += newParagraphs[j].length + 1; // Include the newline character
-      }
+        } else if (token.length > 0) {
+          // Text content
+          if (this.paragraphs.length === 0) {
+            // Start new paragraph
+            this.paragraphs.push({
+              text: token,
+              dirty: false,
+              offset: currentOffset,
+              length: token.length,
+              lines: [],
+            });
+          } else {
+            // Append to existing paragraph
+            const lastParagraph = this.paragraphs[this.paragraphs.length - 1];
+            lastParagraph.text += token;
+            lastParagraph.length = lastParagraph.text.length; // Update length immediately
+            lastParagraph.dirty = true;
+          }
+          currentOffset += token.length;
+        }
+      });
     }
   }
 
   private mapCursorPosition(cursorPosition: number) {
     this._renderedCursorPosition = [-1, -1, -1]; // Reset cursor position
+
+    // IF the cursor position is equal to the end of the document, we need to handle it specially
+    if (cursorPosition === this._pieceTable.length) {
+      // Set cursor at the end of the last paragraph
+      const lastParagraph = this.paragraphs[this.paragraphs.length - 1];
+      if (lastParagraph) {
+        const lastLine = lastParagraph.lines[lastParagraph.lines.length - 1];
+        this._renderedCursorPosition = [
+          this.paragraphs.length - 1,
+          lastParagraph.lines.length - 1,
+          this.ctx.measureText(lastLine.text).width,
+        ];
+      }
+      return;
+    }
 
     // 1. Within which paragraph is the cursor position?
     let paragraphIndex = -1;
@@ -96,7 +142,8 @@ export class TextRenderer {
       const paragraph = this.paragraphs[i];
 
       const isCursorInParagraph =
-        cursorPosition >= paragraph.offset && cursorPosition < paragraph.offset + paragraph.length;
+        cursorPosition >= paragraph.offset &&
+        cursorPosition < paragraph.offset + paragraph.length + 1;
 
       // If the cursor is in the paragraph, set the index of the paragraph and break the loop
       if (isCursorInParagraph) {
@@ -118,9 +165,21 @@ export class TextRenderer {
 
     // Search the cursor position in the lines of the paragraphs
     let lineIndex = -1;
+
     for (let j = 0; j < paragraph.lines.length; j++) {
       const line = paragraph.lines[j];
-      if (cursorPosition >= line.offset && cursorPosition < line.offset + line.length) {
+
+      const isOnlyLine = paragraph.lines.length === 1;
+      const isLastLine = j === paragraph.lines.length - 1;
+
+      const isLastLineButNotOnlyLine = isLastLine && !isOnlyLine;
+
+      let endOffsetDelta = isOnlyLine ? 1 : isLastLineButNotOnlyLine ? 1 : 0;
+
+      if (
+        cursorPosition >= line.offset &&
+        cursorPosition < line.offset + line.length + endOffsetDelta
+      ) {
         lineIndex = j;
         break;
       }
@@ -139,47 +198,58 @@ export class TextRenderer {
   }
 
   // Split a paragraph into lines based on the canvas width
-  /// TODO: still no working
   private splitIntoLines(paragraph: Paragraph, maxWidth: number): void {
-    const words = paragraph.text.split(' ');
-    let currentLine = '';
+    // Split while preserving spaces
+    const tokens = paragraph.text.split(/(\s+)/);
     paragraph.lines = [];
 
     let offsetInParagraph = paragraph.offset;
+    let currentLine = '';
 
-    words.forEach((word) => {
-      // Handle if the word is whitespace
-      const wordOrWhitespace = word.length === 0 ? ' ' : word;
+    console.log(tokens);
 
-      // If we're not at the start of the line, add a space before the word
-      const testLine =
-        currentLine +
-        (currentLine.length === 0 ? '' : word.length === 0 ? '' : ' ') +
-        wordOrWhitespace;
-
+    tokens.forEach((token) => {
+      const testLine = currentLine + token;
       const metrics = this.ctx.measureText(testLine);
 
-      if (metrics.width > maxWidth && currentLine) {
+      //If the token is spaces only, add test those spaces one by one
+      if (token.trim() === '') {
+        for (const char of token) {
+          const testChar = currentLine + char;
+          const charMetrics = this.ctx.measureText(testChar);
+          if (charMetrics.width > maxWidth && currentLine.trim()) {
+            paragraph.lines.push({
+              text: currentLine,
+              offset: offsetInParagraph,
+              length: currentLine.length,
+            });
+            offsetInParagraph += currentLine.length;
+            currentLine = char; // Start new line with the space character
+          } else {
+            currentLine = testChar; // Add the space to the current line
+          }
+        }
+        return; // Skip further processing for spaces
+      }
+
+      if (metrics.width > maxWidth && currentLine.trim()) {
         paragraph.lines.push({
           text: currentLine,
           offset: offsetInParagraph,
-          length: currentLine.length + 1, // Include the space character
+          length: currentLine.length,
         });
-        offsetInParagraph += currentLine.length + 1; // Include the space character
-        currentLine = wordOrWhitespace; // Start a new line with the current word
+        offsetInParagraph += currentLine.length;
+        currentLine = token;
       } else {
         currentLine = testLine;
       }
     });
 
-    // Add the last line if it exists
-    if (currentLine) {
-      paragraph.lines.push({
-        text: currentLine,
-        offset: offsetInParagraph,
-        length: currentLine.length + 1, // Include the space character
-      });
-    }
+    paragraph.lines.push({
+      text: currentLine || '',
+      offset: offsetInParagraph,
+      length: currentLine.length,
+    });
   }
 
   // Render a single line of text on the canvas
@@ -187,31 +257,83 @@ export class TextRenderer {
     this.ctx.fillText(text, x, y);
   }
 
+  // Set the base text style
+  private setBaseTextStyle(): void {
+    this.ctx.font = '16px Arial';
+    this.ctx.fillStyle = 'black';
+  }
+
+  // Render debug information for paragraphs, lines, and cursor position
+  private renderDebugInfo(cursorPosition: number, lineHeight: number): void {
+    if (!this._showDebugInfo) return;
+
+    // Save the current context state to avoid interference with main text rendering
+    this.ctx.save();
+
+    // Reset any transformations to render debug info in absolute positions
+    this.ctx.setTransform(1, 0, 0, 1, 0, 0);
+
+    // Set debug text style
+    this.ctx.fillStyle = 'blue';
+    this.ctx.font = '12px Arial';
+
+    this.paragraphs.forEach((paragraph, pindex) => {
+      // Render paragraph debug info
+      this.ctx.fillText(
+        `Paragraph ${pindex} - offset ${paragraph.offset} - length ${paragraph.length}`,
+        800,
+        lineHeight + pindex * lineHeight * paragraph.lines.length,
+      );
+
+      paragraph.lines.forEach((line, lindex) => {
+        const currentY = lineHeight * (this.getCurrentLineIndex(pindex, lindex) + 1);
+
+        // Render line debug info
+        this.ctx.fillText(`offset ${line.offset}`, 10, currentY);
+        this.ctx.fillText(`length ${line.length}`, 80, currentY);
+      });
+    });
+
+    // Render cursor position debug info
+    this.ctx.fillText(
+      `cursor Position i ${cursorPosition} - p ${this._renderedCursorPosition[0]} - l ${this._renderedCursorPosition[1]} - c ${this._renderedCursorPosition[2]}`,
+      800,
+      200,
+    );
+
+    // Restore the context state (which will restore the base text style)
+    this.ctx.restore();
+  }
+
+  // Helper function to get the absolute line index for debug positioning
+  private getCurrentLineIndex(paragraphIndex: number, lineIndex: number): number {
+    let totalLines = 0;
+    for (let i = 0; i < paragraphIndex; i++) {
+      totalLines += this.paragraphs[i].lines.length;
+    }
+    return totalLines + lineIndex;
+  }
+
   public render(cursorPosition: number): void {
-    const leftMargin = 150; // Left margin for the text
+    const leftMargin = this.leftMargin; // Left margin for the text
     const lineHeight = 20; // Height of each line
     this.ctx.clearRect(0, 0, this.ctx.canvas.width, this.ctx.canvas.height);
 
     this.splitIntoParagraphs();
     console.log('Rendering text at cursor position:', cursorPosition, this._renderedCursorPosition);
     this.paragraphs.forEach((paragraph) => {
-      this.splitIntoLines(paragraph, 600); // Assuming a max width of 780px for the canvas
+      this.splitIntoLines(paragraph, this.wrappingWidth); // Assuming a max width of 780px for the canvas
     });
     this.mapCursorPosition(cursorPosition);
 
     this.ctx.save();
 
+    // Set base text style for all text rendering
+    this.setBaseTextStyle();
+
     this.paragraphs.forEach((paragraph, pindex) => {
-      this.ctx.fillStyle = 'blue';
-      this.ctx.font = '12px Arial';
-      this.ctx.fillText(
-        `Paragraph ${pindex} - offset ${paragraph.offset} - length ${paragraph.length}`,
-        800,
-        lineHeight,
-      );
       paragraph.lines.forEach((line, lindex) => {
-        this.ctx.font = '16px Arial'; // Reset font in case it was changed
-        this.ctx.fillStyle = 'black'; // Default text color
+        // Apply highlighting if this paragraph contains the cursor
         if (this._renderedCursorPosition[0] === pindex) {
           this.ctx.fillStyle = 'green'; // Highlight the paragraph with the cursor
         }
@@ -231,20 +353,11 @@ export class TextRenderer {
 
         this.ctx.translate(0, lineHeight);
         this.renderLine(line.text, leftMargin, 0);
-
-        // Render line length debug info
-        this.ctx.fillStyle = 'blue';
-        this.ctx.font = '12px Arial';
-        this.ctx.fillText(`offset ${line.offset}`, 10, 0);
-        this.ctx.fillText(`length ${line.length}`, 80, 0);
       });
     });
 
-    this.ctx.fillText(
-      `cursor Position i ${cursorPosition} - p ${this._renderedCursorPosition[0]} - l ${this._renderedCursorPosition[1]} - c ${this._renderedCursorPosition[2]}`,
-      800,
-      200,
-    );
+    // Render debug information if enabled
+    this.renderDebugInfo(cursorPosition, lineHeight);
 
     this.ctx.restore();
   }

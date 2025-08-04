@@ -266,5 +266,6 @@ export class PieceTable {
 export function getTextLengthWithEscapes(text: string): number {
   // Count the number of escaped characters (e.g., \n, \r)
   const numberOfEscapedCharacters = (text.match(/[\n\r]/g) || []).length;
+  return text.length;
   return text.length + numberOfEscapedCharacters; // Return length including escapes
 }

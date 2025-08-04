@@ -1,9 +1,11 @@
-import Canvas from "./components/Canvas"
+import Canvas from './components/Canvas';
 
 function App() {
-  return <main className="bg-gray-800 w-full h-full flex items-center justify-center">
-    <Canvas />
-  </main>
+  return (
+    <main className="bg-black/5 w-full h-full flex items-center justify-center">
+      <Canvas />
+    </main>
+  );
 }
 
-export default App
+export default App;
