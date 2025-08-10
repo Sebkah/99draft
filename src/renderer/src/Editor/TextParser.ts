@@ -116,8 +116,6 @@ export class TextParser {
     let offsetInParagraph = paragraph.offset;
     let currentLine = '';
 
-    console.log(tokens);
-
     tokens.forEach((token) => {
       const testLine = currentLine + token;
       const metrics = this._ctx.measureText(testLine);
@@ -162,14 +160,7 @@ export class TextParser {
     });
   }
 
-  // Helper function to get the absolute line index for debug positioning
-  public getGlobalLineIndex(paragraphIndex: number, lineIndex: number): number {
-    let totalLines = 0;
-    for (let i = 0; i < paragraphIndex; i++) {
-      totalLines += this._paragraphs[i].lines.length;
-    }
-    return totalLines + lineIndex;
-  }
+
 
   // Map cursor position to paragraph, line, and pixel offset
   public mapCursorPosition(

@@ -1,3 +1,4 @@
+import { Editor } from './Editor';
 import { PieceTable } from './PieceTable/PieceTable';
 import { TextRenderer } from './TextRenderer';
 
@@ -10,14 +11,18 @@ export class InputManager {
   private cursorPosition: { current: number };
   private textRenderer: TextRenderer;
 
+  private editor: Editor;
+
   constructor(
     pieceTable: PieceTable,
     cursorPosition: { current: number },
     textRenderer: TextRenderer,
+    editor: Editor,
   ) {
     this.pieceTable = pieceTable;
     this.cursorPosition = cursorPosition;
     this.textRenderer = textRenderer;
+    this.editor = editor;
   }
 
   /**
@@ -28,10 +33,7 @@ export class InputManager {
   handleKeyDown(event: KeyboardEvent): boolean {
     // Handle Enter key - insert newline at cursor position
     if (event.key === 'Enter') {
-      this.pieceTable.insert('\n', this.cursorPosition.current);
-      this.cursorPosition.current += 1;
-      console.log('Inserted newline');
-      this.textRenderer.render(this.cursorPosition.current);
+      this.insertText('\n');
       return true;
     }
 
@@ -54,15 +56,9 @@ export class InputManager {
 
     // Handle printable character input
     if (event.key.length === 1 && !event.ctrlKey && !event.metaKey) {
-      console.log('Key pressed:', event.key);
+ 
 
-      // Insert character at current cursor position
-      this.pieceTable.insert(event.key, this.cursorPosition.current);
-      this.cursorPosition.current = Math.min(
-        this.pieceTable.length,
-        this.cursorPosition.current + 1,
-      );
-      this.textRenderer.render(this.cursorPosition.current);
+      this.insertText(event.key);
       return true;
     }
 
@@ -93,24 +89,12 @@ export class InputManager {
    */
   insertText(text: string): void {
     this.pieceTable.insert(text, this.cursorPosition.current);
-    this.cursorPosition.current += text.length;
+    this.cursorPosition.current = Math.min(
+      this.pieceTable.length,
+      this.cursorPosition.current + text.length,
+    );
     this.textRenderer.render(this.cursorPosition.current);
-  }
-
-  /**
-   * Updates the piece table reference (useful if piece table is recreated)
-   * @param pieceTable - New piece table instance
-   */
-  updatePieceTable(pieceTable: PieceTable): void {
-    this.pieceTable = pieceTable;
-  }
-
-  /**
-   * Updates the text renderer reference (useful if text renderer is recreated)
-   * @param textRenderer - New text renderer instance
-   */
-  updateTextRenderer(textRenderer: TextRenderer): void {
-    this.textRenderer = textRenderer;
+    this.editor.triggerDebugUpdate();
   }
 
   /**
@@ -122,13 +106,6 @@ export class InputManager {
   updateMargins(leftMargin: number, rightMargin: number, canvasWidth: number): void {
     this.textRenderer.leftMargin = leftMargin;
     this.textRenderer.rightMargin = canvasWidth - rightMargin;
-    this.textRenderer.render(this.cursorPosition.current);
-  }
-
-  /**
-   * Forces a re-render of the text content
-   */
-  render(): void {
     this.textRenderer.render(this.cursorPosition.current);
   }
 }

@@ -9,7 +9,7 @@ export class TextRenderer {
   private _leftMargin: number = 100;
   private _rightMargin: number = 100;
 
-  private _showDebugInfo: boolean = true;
+  private _showDebugInfo: boolean = false;
 
   // Getter for wrapping width
   private get wrappingWidth(): number {
@@ -63,7 +63,7 @@ export class TextRenderer {
   }
 
   // Render debug information for paragraphs, lines, and cursor position
-  private renderDebugInfo(cursorPosition: number, lineHeight: number): void {
+  private renderDebugInfo(lineHeight: number): void {
     if (!this._showDebugInfo) return;
 
     // Save the current context state to avoid interference with main text rendering
@@ -111,8 +111,6 @@ export class TextRenderer {
       console.log('Text was reparsed');
     }
 
-    console.log('Rendering text at cursor position:', cursorPosition, this._renderedCursorPosition);
-
     // Map cursor position (this happens on every render, even if text wasn't reparsed)
     this._renderedCursorPosition = this._textParser.mapCursorPosition(cursorPosition, this.ctx);
 
@@ -142,7 +140,8 @@ export class TextRenderer {
     });
 
     this.ctx.restore();
+
     // Render debug information if enabled
-    this.renderDebugInfo(cursorPosition, lineHeight);
+    this.renderDebugInfo(lineHeight);
   }
 }

@@ -130,15 +130,11 @@ export class PieceTable {
       throw new Error('Insert position out of bounds');
     }
 
-    console.log('Add buffer length before insert:', this._addBufferLength);
-
     const textLength = text.length;
 
     // 1. Append the new text to the 'add' buffer and create a piece for it.
     this.addBuffer += text;
     const newTextOffset = this._addBufferLength;
-
-    console.log('New text offset:', newTextOffset);
 
     const cursorAtEnd = position === this._length;
 
@@ -157,7 +153,6 @@ export class PieceTable {
         };
         // Replace the last piece with the new one.
         this.pieces[this.pieces.length - 1] = newPiece;
-        console.log('Extended last piece with new text');
       } else {
         // Otherwise, we create a new piece for the 'add' buffer.
         const newPiece: Piece = {
@@ -166,7 +161,6 @@ export class PieceTable {
           length: textLength,
         };
         this.pieces.push(newPiece);
-        console.log('help');
       }
 
       this.updateLength(textLength);

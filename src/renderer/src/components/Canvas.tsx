@@ -1,53 +1,33 @@
-import { PieceTable } from '@renderer/Editor/PieceTable/PieceTable';
-import { TextRenderer } from '@renderer/Editor/TextRenderer';
-import { InputManager } from '@renderer/Editor/InputManager';
+import { Editor, PieceDebug } from '@renderer/Editor/Editor';
 import DebugPanel from './DebugPanel';
 import Ruler from './Ruler';
 
 import React, { useEffect, useRef, useState } from 'react';
 
 /**
- * Type definition for debugging piece table structure
- */
-type PieceDebug = {
-  source: 'original' | 'add';
-  offset: number;
-  length: number;
-  text: string;
-};
-
-/**
  * Canvas component that implements a text editor using piece table data structure
  * Provides keyboard input handling and visual rendering of text content
  */
 const Canvas = () => {
-  // Refs for DOM elements and cursor position
+  // Refs for DOM elements
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const cursorPosition = useRef<number>(0);
 
-  // Initialize piece table with sample text
-  const [pieceTable] = useState(() => {
-    const table = new PieceTable(
+  // Initialize editor with sample text
+  const [editor] = useState(() => {
+    return new Editor(
       'Hello\n world!\n This is a piece   table example.\nYou can insert and delete text efficiently using this structure.\n Piece tables are great for text editors and similar applications. END OF ORIGINAL TEXT',
     );
-
-    // Set initial cursor position to end of text
-    cursorPosition.current = table.length;
-
-    return table;
   });
 
   // Layout/rendering state
   const [leftMargin, setLeftMargin] = useState<number>(50);
   const [rightMargin, setRightMargin] = useState<number>(750);
 
-  // Initialize textRenderer and inputManager with lazy initialization
-  const [textRenderer, setTextRenderer] = useState<TextRenderer | null>(null);
-  const [inputManager, setInputManager] = useState<InputManager | null>(null);
+  // Debug state
   const [piecesForDebug, setPieces] = useState<PieceDebug[]>([]);
 
   /**
-   * Initialize canvas context, text renderer, and input manager
+   * Initialize canvas context and editor
    * Also sets up debug information update interval
    */
   useEffect(() => {
@@ -57,64 +37,34 @@ const Canvas = () => {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    // Initialize text renderer and input manager if not already created
-    if (!textRenderer || !inputManager) {
-      const renderer = new TextRenderer(ctx, pieceTable);
-      const manager = new InputManager(pieceTable, cursorPosition, renderer);
+    // Initialize editor with canvas context
+    editor.initialize(ctx);
 
-      setTextRenderer(renderer);
-      setInputManager(manager);
-
-      // Set initial margins and render
-      manager.updateMargins(leftMargin, rightMargin, canvas.width);
-    }
+    // Set initial margins
+    editor.setMargins(leftMargin, rightMargin);
 
     // Focus the canvas for keyboard input
-
     canvas.focus();
 
-    // Update debug information
-    const debugInterval = setInterval(() => {
-      setPieces((prev) => {
-        if (!pieceTable) return prev;
+    // Start debug information updates
+    editor.startDebugUpdates(setPieces);
 
-        return pieceTable.getPieces().map((piece) => {
-          // Extract text from appropriate buffer based on piece source
-          if (piece.source === 'original') {
-            return {
-              ...piece,
-              text: pieceTable.originalBuffer.substring(piece.offset, piece.offset + piece.length),
-            };
-          }
-          return {
-            ...piece,
-            text: pieceTable.addBuffer.substring(piece.offset, piece.offset + piece.length),
-          };
-        });
-      });
-    }, 100);
 
-    // Cleanup
-    return () => {
-      clearInterval(debugInterval);
-    };
-  }, [pieceTable, leftMargin, rightMargin, textRenderer, inputManager]);
+  }, [editor, leftMargin, rightMargin]);
 
-  // Separate effect to handle margin updates
+  // Cleanup effect for component unmount
   useEffect(() => {
-    if (inputManager && canvasRef.current) {
-      inputManager.updateMargins(leftMargin, rightMargin, canvasRef.current.width);
-    }
-  }, [leftMargin, rightMargin, inputManager]);
+    return () => {
+      editor.dispose();
+    };
+  }, [editor]);
 
   /**
    * Handles keyboard input for text editing and cursor movement
    * @param event - React keyboard event from canvas element
    */
   const handleKeyDown = (event: React.KeyboardEvent<HTMLCanvasElement>) => {
-    if (!inputManager) return;
-
-    const handled = inputManager.handleKeyDown(event.nativeEvent);
+    const handled = editor.handleKeyDown(event.nativeEvent);
     if (handled) {
       event.preventDefault();
     }
@@ -125,9 +75,7 @@ const Canvas = () => {
    */
   const handleLeftMarginChange = (newLeftMargin: number) => {
     setLeftMargin(newLeftMargin);
-    if (inputManager && canvasRef.current) {
-      inputManager.updateMargins(newLeftMargin, rightMargin, canvasRef.current.width);
-    }
+    editor.setMargins(newLeftMargin, rightMargin);
   };
 
   /**
@@ -135,9 +83,7 @@ const Canvas = () => {
    */
   const handleRightMarginChange = (newRightMargin: number) => {
     setRightMargin(newRightMargin);
-    if (inputManager && canvasRef.current) {
-      inputManager.updateMargins(leftMargin, newRightMargin, canvasRef.current.width);
-    }
+    editor.setMargins(leftMargin, newRightMargin);
   };
 
   return (
@@ -163,9 +109,9 @@ const Canvas = () => {
 
       {/* Debug panel positioned at bottom right */}
       <DebugPanel
-        cursorPosition={cursorPosition.current}
-        pieceTable={pieceTable}
-        textRenderer={textRenderer}
+        cursorPosition={editor.getCursorPosition()}
+        pieceTable={editor.getPieceTable()}
+        textRenderer={editor.getTextRenderer()}
         piecesForDebug={piecesForDebug}
       />
     </>
