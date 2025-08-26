@@ -49,7 +49,7 @@ const DebugPanel: React.FC<DebugPanelProps> = ({
   };
 
   return (
-    <motion.div className="fixed bottom-2 right-2 w-180 max-h-80 overflow-auto bg-gray-900 text-white p-2 rounded-lg shadow-2xl z-50">
+    <motion.div className="fixed bottom-2 right-2 w-180  overflow-auto bg-gray-900 text-white p-2 rounded-lg shadow-2xl z-50">
       {/* Main panel header */}
       <div
         className="flex items-center gap-1 mb-2 cursor-pointer hover:bg-gray-800 rounded px-1 py-0.5 transition-colors"
@@ -172,7 +172,7 @@ const DebugPanel: React.FC<DebugPanelProps> = ({
               </div>
             </div>
             {!collapsedSections.structure && (
-              <div className="bg-gray-900 rounded p-1.5 border border-blue-400/20 max-h-32 overflow-auto custom-scrollbar">
+              <div className="bg-gray-900 rounded p-1.5 border border-blue-400/20  overflow-auto custom-scrollbar">
                 <div className="space-y-1">
                   {piecesForDebug.map((piece, index) => (
                     <div

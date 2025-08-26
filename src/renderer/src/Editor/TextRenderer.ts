@@ -49,6 +49,8 @@ export class TextRenderer {
     this._textParser = new TextParser(pieceTable, ctx);
 
     this.ctx.font = '16px Arial';
+
+    
   }
 
   // Render a single line of text on the canvas
@@ -100,7 +102,14 @@ export class TextRenderer {
     this.ctx.restore();
   }
 
-  public render(cursorPosition: number): void {
+  public setCursorPosition(position: number): void {
+    this._textParser.parseIfNeeded(this.wrappingWidth);
+
+    this._renderedCursorPosition = this._textParser.mapCursorPosition(position, this.ctx);  
+
+  }
+
+  public render(): void {
     const leftMargin = this.leftMargin; // Left margin for the text
     const lineHeight = 20; // Height of each line
     this.ctx.clearRect(0, 0, this.ctx.canvas.width, this.ctx.canvas.height);
@@ -110,9 +119,6 @@ export class TextRenderer {
     if (didReparse) {
       console.log('Text was reparsed');
     }
-
-    // Map cursor position (this happens on every render, even if text wasn't reparsed)
-    this._renderedCursorPosition = this._textParser.mapCursorPosition(cursorPosition, this.ctx);
 
     this.ctx.save();
 

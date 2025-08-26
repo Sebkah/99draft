@@ -1,6 +1,6 @@
 import { PieceTable } from './PieceTable/PieceTable';
 import { TextRenderer } from './TextRenderer';
-import { InputManager } from './InputManager';
+import { InputManager } from './Input/InputManager';
 
 /**
  * Type definition for debugging piece table structure
@@ -20,7 +20,7 @@ export class Editor {
   private pieceTable: PieceTable;
   private textRenderer: TextRenderer | null = null;
   private inputManager: InputManager | null = null;
-  private cursorPosition: { current: number };
+  private cursorPosition: number;
   private leftMargin: number = 50;
   private rightMargin: number = 750;
   private canvas: HTMLCanvasElement | null = null;
@@ -31,7 +31,7 @@ export class Editor {
     this.pieceTable = new PieceTable(initialText);
 
     // Initialize cursor position at end of text
-    this.cursorPosition = { current: this.pieceTable.length };
+    this.cursorPosition = this.pieceTable.length ;
   }
 
   /**
@@ -48,6 +48,7 @@ export class Editor {
 
     // Initialize text renderer and input manager
     this.textRenderer = new TextRenderer(ctx, this.pieceTable);
+    this.textRenderer.setCursorPosition(this.cursorPosition);
     this.inputManager = new InputManager(
       this.pieceTable,
       this.cursorPosition,
@@ -103,7 +104,7 @@ export class Editor {
    * Get the current cursor position
    */
   getCursorPosition(): number {
-    return this.cursorPosition.current;
+    return this.cursorPosition;
   }
 
   /**

@@ -6,7 +6,7 @@ export interface Piece {
   readonly source: 'original' | 'add';
 
   /** The starting index (offset) of the text segment in the source buffer. */
-  readonly offset: number;
+  offset: number;
 
   /** The number of characters in the text segment. */
   length: number;
@@ -195,19 +195,19 @@ export class PieceTable {
     const before: Piece | null =
       offsetInPiece > 0
         ? {
-            source: oldPiece.source,
-            offset: oldPiece.offset,
-            length: offsetInPiece,
-          }
+          source: oldPiece.source,
+          offset: oldPiece.offset,
+          length: offsetInPiece,
+        }
         : null;
 
     const after: Piece | null =
       offsetInPiece < oldPiece.length
         ? {
-            source: oldPiece.source,
-            offset: oldPiece.offset + offsetInPiece,
-            length: oldPiece.length - offsetInPiece,
-          }
+          source: oldPiece.source,
+          offset: oldPiece.offset + offsetInPiece,
+          length: oldPiece.length - offsetInPiece,
+        }
         : null;
 
     // Create the replacement sequence
@@ -231,18 +231,84 @@ export class PieceTable {
    * @param start The starting position of the deletion.
    * @param deleteCount The number of characters to delete.
    */
+  // TODO: FINISH
   public delete(start: number, deleteCount: number): void {
-    // ... This is the most complex operation.
-    // The high-level logic would be:
     // 1. Find the starting piece and ending piece for the deletion range.
-    // 2. Create a new 'before' piece by truncating the starting piece.
-    // 3. Create a new 'after' piece by truncating and shifting the offset of the ending piece.
-    // 4. Replace all pieces within the deletion range with the new (and possibly empty) 'before' and 'after' pieces.
-    // 5. Update the cached length.
-    // (A full implementation is non-trivial).
-    console.log(
-      `Delete operation from ${start} with count ${deleteCount} is not fully implemented in this outline.`,
+    const piece = this._findPiece(start);
+    const endPiece = this._findPiece(start + deleteCount);
+
+    if (deleteCount <= 0) return;
+
+    // 2. Deletion is within a single piece
+    if (piece.pieceIndex === endPiece.pieceIndex) {
+      // Split the piece into up to two pieces, excluding the deleted segment.
+      const oldPiece = this.pieces[piece.pieceIndex];
+
+      // If deletion starts at the beginning of the piece
+      if (piece.offsetInPiece === 0) {
+        if (deleteCount >= oldPiece.length) {
+          // Deletion covers the entire piece, remove it
+          this.pieces.splice(piece.pieceIndex, 1);
+        } else {
+          // Truncate the piece from the start
+          oldPiece.offset += deleteCount;
+          oldPiece.length -= deleteCount;
+        }
+        this.updateLength(-deleteCount);
+        this._version++;
+        return;
+      }
+      // If deletion ends at the end of the piece
+      if (piece.offsetInPiece + deleteCount === oldPiece.length) {
+        // Truncate the piece from the end
+        oldPiece.length -= deleteCount;
+        this.updateLength(-deleteCount);
+        this._version++;
+        return;
+      }
+    }
+
+    // 3. Deletion spans multiple pieces
+
+
+    // Remove fully covered pieces
+    this.pieces.splice(
+      piece.pieceIndex + 1,
+      endPiece.pieceIndex - piece.pieceIndex - 1,
     );
+
+    // Truncate the starting piece
+    const startPiece = this.pieces[piece.pieceIndex];
+    if (piece.offsetInPiece === 0) {
+      // Deletion starts at the beginning of the piece, remove it
+      this.pieces.splice(piece.pieceIndex, 1);
+    } else {
+      // Truncate the piece to exclude the deleted segment
+      startPiece.length = piece.offsetInPiece;
+    }
+
+    // Truncate the ending piece
+    const endPieceObj = this.pieces[piece.pieceIndex + 1];
+    if (endPiece.offsetInPiece === endPieceObj.length) {
+      // Deletion ends at the end of the piece, remove it
+      this.pieces.splice(piece.pieceIndex + 1, 1);
+    } else {
+      // Adjust the offset and length to exclude the deleted segment
+      const deleteUpTo = endPiece.offsetInPiece;
+
+      // The new offset is the old offset plus the number of characters deleted from the start
+      const newOffset = endPieceObj.offset + deleteUpTo;
+
+      //...and the new length is the old length minus the deleted characters
+      const newLength = endPieceObj.length - deleteUpTo;
+      this.pieces[piece.pieceIndex + 1] = {
+        source: endPieceObj.source,
+        offset: newOffset,
+        length: newLength,
+      };
+    }
+
+
 
     // Increment version to track changes (when delete is implemented)
     this._version++;
