@@ -4,7 +4,7 @@ import { TextParser } from './TextParser';
 export class TextRenderer {
   private ctx: CanvasRenderingContext2D;
 
-  private _textParser: TextParser;
+  public _textParser: TextParser;
 
   private _leftMargin: number = 100;
   private _rightMargin: number = 100;
@@ -49,8 +49,6 @@ export class TextRenderer {
     this._textParser = new TextParser(pieceTable, ctx);
 
     this.ctx.font = '16px Arial';
-
-    
   }
 
   // Render a single line of text on the canvas
@@ -105,8 +103,7 @@ export class TextRenderer {
   public setCursorPosition(position: number): void {
     this._textParser.parseIfNeeded(this.wrappingWidth);
 
-    this._renderedCursorPosition = this._textParser.mapCursorPosition(position, this.ctx);  
-
+    this._renderedCursorPosition = this._textParser.mapCursorPosition(position, this.ctx);
   }
 
   public render(): void {

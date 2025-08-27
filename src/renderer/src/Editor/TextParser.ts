@@ -160,8 +160,6 @@ export class TextParser {
     });
   }
 
-
-
   // Map cursor position to paragraph, line, and pixel offset
   public mapCursorPosition(
     cursorPosition: number,
@@ -245,5 +243,78 @@ export class TextParser {
     }
 
     return renderedCursorPosition;
+  }
+
+  public getLineAdjacentCursorPosition(
+    cursorPosition: number,
+    direction: 'above' | 'below',
+  ): number {
+    // Get current cursor position mapping
+    const [paragraphIndex, lineIndex, pixelOffset] = this.mapCursorPosition(
+      cursorPosition,
+      this._ctx,
+    );
+
+    if (paragraphIndex === -1 || lineIndex === -1) {
+      return cursorPosition; // Invalid position, return original
+    }
+
+    const currentParagraph = this._paragraphs[paragraphIndex];
+    let targetParagraphIndex = paragraphIndex;
+    let targetLineIndex = lineIndex;
+
+    // Calculate target line index based on direction
+    if (direction === 'above') {
+      targetLineIndex = lineIndex - 1;
+
+      // If we're at the first line of a paragraph, move to the last line of the previous paragraph
+      if (targetLineIndex < 0 && paragraphIndex > 0) {
+        targetParagraphIndex = paragraphIndex - 1;
+        const prevParagraph = this._paragraphs[targetParagraphIndex];
+        targetLineIndex = prevParagraph.lines.length - 1;
+      }
+    } else {
+      // 'under'
+      targetLineIndex = lineIndex + 1;
+
+      // If we're at the last line of a paragraph, move to the first line of the next paragraph
+      if (
+        targetLineIndex >= currentParagraph.lines.length &&
+        paragraphIndex < this._paragraphs.length - 1
+      ) {
+        targetParagraphIndex = paragraphIndex + 1;
+        targetLineIndex = 0;
+      }
+    }
+
+    // Check if target position is valid
+    if (targetParagraphIndex < 0 || targetParagraphIndex >= this._paragraphs.length) {
+      return cursorPosition; // Out of bounds, return original position
+    }
+
+    const targetParagraph = this._paragraphs[targetParagraphIndex];
+    if (targetLineIndex < 0 || targetLineIndex >= targetParagraph.lines.length) {
+      return cursorPosition; // Out of bounds, return original position
+    }
+
+    const targetLine = targetParagraph.lines[targetLineIndex];
+
+    // Find the closest character position in the target line based on pixel offset
+    let closestPosition = targetLine.offset;
+    let minDistance = Math.abs(pixelOffset);
+
+    // Check each character position in the target line
+    for (let i = 0; i <= targetLine.length; i++) {
+      const textUpToPosition = targetLine.text.substring(0, i);
+      const currentPixelOffset = this._ctx.measureText(textUpToPosition).width;
+      const distance = Math.abs(currentPixelOffset - pixelOffset);
+
+      if (distance < minDistance) {
+        minDistance = distance;
+        closestPosition = targetLine.offset + i;
+      }
+    }
+
+    return closestPosition;
   }
 }

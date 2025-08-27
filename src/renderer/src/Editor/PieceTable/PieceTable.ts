@@ -114,6 +114,15 @@ export class PieceTable {
     return this.pieces;
   }
 
+  /**
+   * Updates the document length and add buffer length tracking.
+   *
+   * This helper method ensures that both the total document length and
+   * the add buffer length stay in sync when text is added or removed.
+   *
+   * @param count Positive for insertions, negative for deletions
+   * @private
+   */
   private updateLength(count: number): void {
     this._length += count;
     this._addBufferLength += count;
@@ -138,34 +147,26 @@ export class PieceTable {
 
     const cursorAtEnd = position === this._length;
 
-    // If inserting at the very end of the document
+    // If inserting at the end, append new add-buffer piece and merge inline
     if (cursorAtEnd) {
-      // If inserting at the end, we can just append to the last piece.
-      const { offset, length, source } = this.pieces[this.pieces.length - 1];
-
-      //If the last piece is from the 'add' buffer, we can extend it.
-      if (source === 'add') {
-        // Extend the last piece with the new text.
-        const newPiece: Piece = {
-          source: 'add',
-          offset, // Keep the original offset
-          length: length + textLength, // Extend the length
-        };
-        // Replace the last piece with the new one.
-        this.pieces[this.pieces.length - 1] = newPiece;
-      } else {
-        // Otherwise, we create a new piece for the 'add' buffer.
-        const newPiece: Piece = {
-          source: 'add',
-          offset: newTextOffset,
-          length: textLength,
-        };
-        this.pieces.push(newPiece);
-      }
-
+      const newPiece: Piece = { source: 'add', offset: newTextOffset, length: textLength };
+      this.pieces.push(newPiece);
       this.updateLength(textLength);
       this._version++;
-
+      // Inline merge with previous if contiguous
+      const last = this.pieces.length - 1;
+      if (last > 0) {
+        const prev = this.pieces[last - 1];
+        const curr = this.pieces[last];
+        if (
+          prev.source === 'add' &&
+          curr.source === 'add' &&
+          prev.offset + prev.length === curr.offset
+        ) {
+          prev.length += curr.length;
+          this.pieces.splice(last, 1);
+        }
+      }
       return;
     }
 
@@ -177,14 +178,12 @@ export class PieceTable {
 
     // 2. Find the piece where the insertion occurs.
     const { pieceIndex, offsetInPiece } = this._findPiece(position);
-
-    // 3. Split the existing piece and insert the new piece.
+    // 3. Merge into existing add-buffer piece if insertion at its end and contiguous
     const oldPiece = this.pieces[pieceIndex];
-
     if (
-      oldPiece.source === 'add' && //If the piece is from the 'add' buffer
-      offsetInPiece === oldPiece.length && //If the insertion is at the end of the piece
-      oldPiece.offset + oldPiece.length === this._addBufferLength //If the piece maps to the end of the add buffer
+      oldPiece.source === 'add' &&
+      offsetInPiece === oldPiece.length &&
+      oldPiece.offset + oldPiece.length === newTextOffset
     ) {
       oldPiece.length += textLength;
       this.updateLength(textLength);
@@ -192,22 +191,23 @@ export class PieceTable {
       return;
     }
 
+    // 4. Split the existing piece and insert the new piece.
     const before: Piece | null =
       offsetInPiece > 0
         ? {
-          source: oldPiece.source,
-          offset: oldPiece.offset,
-          length: offsetInPiece,
-        }
+            source: oldPiece.source,
+            offset: oldPiece.offset,
+            length: offsetInPiece,
+          }
         : null;
 
     const after: Piece | null =
       offsetInPiece < oldPiece.length
         ? {
-          source: oldPiece.source,
-          offset: oldPiece.offset + offsetInPiece,
-          length: oldPiece.length - offsetInPiece,
-        }
+            source: oldPiece.source,
+            offset: oldPiece.offset + offsetInPiece,
+            length: oldPiece.length - offsetInPiece,
+          }
         : null;
 
     // Create the replacement sequence
@@ -219,132 +219,170 @@ export class PieceTable {
     // 4. Replace the old piece with the new sequence of pieces.
     this.pieces.splice(pieceIndex, 1, ...replacement);
 
-    // 5. Update the cached length.
+    // 5. Update length and version
     this.updateLength(textLength);
-
-    // 6. Increment version to track changes
     this._version++;
+
+    // 6. Inline merge around the new piece
+    const insertionIndex = pieceIndex + (before ? 1 : 0);
+    // Merge with previous piece if the newly inserted add-piece abuts an earlier add-piece
+    // insertionIndex > 0 ensures there is a piece immediately to the left
+    if (insertionIndex > 0) {
+      console.log('Merging with previous piece if possible');
+      // prev is the piece immediately before the insertion point
+      const prev = this.pieces[insertionIndex - 1];
+      // curr is the newly inserted add-buffer piece at insertionIndex
+      const curr = this.pieces[insertionIndex];
+      // Only merge if both are from the add-buffer and their offsets line up exactly
+      if (
+        prev.source === 'add' && // left piece is from add-buffer
+        curr.source === 'add' && // right piece is also from add-buffer
+        prev.offset + prev.length === curr.offset // contiguous in buffer
+      ) {
+        // Extend the left piece to include the new text
+        prev.length += curr.length;
+        // Remove the now-redundant right piece
+        this.pieces.splice(insertionIndex, 1);
+      }
+    }
+    // Merge with next piece if the newly inserted add-piece directly precedes another add-piece
+    // insertionIndex < pieces.length - 1 ensures a neighbor exists on the right
+    if (insertionIndex < this.pieces.length - 1) {
+      console.log('Merging with next piece if possible');
+      // curr2 is the newly inserted (or merged) add-buffer piece
+      const curr2 = this.pieces[insertionIndex];
+      // next is the piece immediately after insertionIndex
+      const next = this.pieces[insertionIndex + 1];
+      // Only merge if both are from add-buffer and contiguous
+      if (
+        curr2.source === 'add' && // current piece from add-buffer
+        next.source === 'add' && // right neighbor also from add-buffer
+        curr2.offset + curr2.length === next.offset // contiguous in buffer
+      ) {
+        // Extend current piece to cover the neighbor
+        curr2.length += next.length;
+        // Remove the neighbor piece as it's now merged
+        this.pieces.splice(insertionIndex + 1, 1);
+      }
+    }
+    return;
   }
 
   /**
    * Deletes a number of characters starting at a specific position.
    * @param start The starting position of the deletion.
    * @param deleteCount The number of characters to delete.
+   * @throws Error if the deletion range is invalid
    */
-  // TODO: FINISH
   public delete(start: number, deleteCount: number): void {
+    // Input validation
+    if (deleteCount <= 0) return;
+    if (start < 0) {
+      throw new Error('Delete: start position cannot be negative');
+    }
+    if (start >= this._length) {
+      throw new Error('Delete: start position out of bounds');
+    }
+    if (start + deleteCount > this._length) {
+      deleteCount = this._length - start; // Clamp to document length
+    }
+
     // 1. Find the starting piece and ending piece for the deletion range.
-    const piece = this._findPiece(start);
+    const startpiece = this._findPiece(start);
     const endPiece = this._findPiece(start + deleteCount);
 
-    if (deleteCount <= 0) return;
-
     // 2. Deletion is within a single piece
-    if (piece.pieceIndex === endPiece.pieceIndex) {
-      // Split the piece into up to two pieces, excluding the deleted segment.
-      const oldPiece = this.pieces[piece.pieceIndex];
-
-      // If deletion starts at the beginning of the piece
-      if (piece.offsetInPiece === 0) {
-        if (deleteCount >= oldPiece.length) {
-          // Deletion covers the entire piece, remove it
-          this.pieces.splice(piece.pieceIndex, 1);
-        } else {
-          // Truncate the piece from the start
-          oldPiece.offset += deleteCount;
-          oldPiece.length -= deleteCount;
-        }
-        this.updateLength(-deleteCount);
-        this._version++;
-        return;
-      }
-      // If deletion ends at the end of the piece
-      if (piece.offsetInPiece + deleteCount === oldPiece.length) {
-        // Truncate the piece from the end
-        oldPiece.length -= deleteCount;
-        this.updateLength(-deleteCount);
-        this._version++;
-        return;
-      }
+    if (startpiece.pieceIndex === endPiece.pieceIndex) {
+      // Deletion within single piece
+      this._truncatePiece(
+        startpiece.pieceIndex,
+        [startpiece.offsetInPiece, startpiece.offsetInPiece + deleteCount],
+        'delete',
+      );
+      return;
     }
 
     // 3. Deletion spans multiple pieces
-
-
-    // Remove fully covered pieces
-    this.pieces.splice(
-      piece.pieceIndex + 1,
-      endPiece.pieceIndex - piece.pieceIndex - 1,
-    );
-
-    // Truncate the starting piece
-    const startPiece = this.pieces[piece.pieceIndex];
-    if (piece.offsetInPiece === 0) {
-      // Deletion starts at the beginning of the piece, remove it
-      this.pieces.splice(piece.pieceIndex, 1);
-    } else {
-      // Truncate the piece to exclude the deleted segment
-      startPiece.length = piece.offsetInPiece;
+    if (startpiece.pieceIndex !== endPiece.pieceIndex) {
+      const startIdx = startpiece.pieceIndex;
+      const endIdx = endPiece.pieceIndex;
+      const newPieces: Piece[] = [];
+      const sp = this.pieces[startIdx];
+      const ep = this.pieces[endIdx];
+      // Keep content before the deletion in the start piece
+      if (startpiece.offsetInPiece > 0) {
+        newPieces.push({
+          source: sp.source,
+          offset: sp.offset,
+          length: startpiece.offsetInPiece,
+        });
+      }
+      // Keep content after the deletion in the end piece
+      if (endPiece.offsetInPiece < ep.length) {
+        newPieces.push({
+          source: ep.source,
+          offset: ep.offset + endPiece.offsetInPiece,
+          length: ep.length - endPiece.offsetInPiece,
+        });
+      }
+      // Replace the range of pieces with the new kept pieces
+      this.pieces.splice(startIdx, endIdx - startIdx + 1, ...newPieces);
+      // Update document length
+      this._length -= deleteCount;
+      this._version++;
+      return;
     }
-
-    // Truncate the ending piece
-    const endPieceObj = this.pieces[piece.pieceIndex + 1];
-    if (endPiece.offsetInPiece === endPieceObj.length) {
-      // Deletion ends at the end of the piece, remove it
-      this.pieces.splice(piece.pieceIndex + 1, 1);
-    } else {
-      // Adjust the offset and length to exclude the deleted segment
-      const deleteUpTo = endPiece.offsetInPiece;
-
-      // The new offset is the old offset plus the number of characters deleted from the start
-      const newOffset = endPieceObj.offset + deleteUpTo;
-
-      //...and the new length is the old length minus the deleted characters
-      const newLength = endPieceObj.length - deleteUpTo;
-      this.pieces[piece.pieceIndex + 1] = {
-        source: endPieceObj.source,
-        offset: newOffset,
-        length: newLength,
-      };
-    }
-
-
-
-    // Increment version to track changes (when delete is implemented)
-    this._version++;
+    // No further action needed; multi-piece case handled above
   }
 
   // PRIVATE HELPER METHODS
-
   /**
    * Finds which piece a given character position falls into.
-   * @returns The index of the piece in the `this.pieces` array and the offset within that piece's text.
+   *
+   * Takes an absolute position in the document and determines:
+   * 1. Which piece contains that position
+   * 2. The relative offset within that piece
+   *
+   * This is a core helper method used by insert/delete operations.
+   *
+   * ```
+   * Document: [    Piece 1    ][   Piece 2   ][   Piece 3   ]
+   * Position:  0              12             25            40
+   *
+   * findPiece(15) would return { pieceIndex: 1, offsetInPiece: 3 }
+   * because position 15 is in the second piece (index 1), 3 characters from its start.
+   * ```
+   *
+   * @param position The absolute character position in the document
+   * @returns Object with pieceIndex (index in this.pieces) and offsetInPiece (relative position)
    * @private
    */
   private _findPiece(position: number): { pieceIndex: number; offsetInPiece: number } {
+    // Handle empty document case
     if (this.pieces.length === 0) {
       return { pieceIndex: -1, offsetInPiece: 0 };
     }
 
+    // Walk through pieces until we find the one containing our position
     let currentPos = 0;
     for (let i = 0; i < this.pieces.length; i++) {
       const piece = this.pieces[i];
+      const pieceEnd = currentPos + piece.length;
 
-      if (position >= currentPos && position <= currentPos + piece.length) {
-        // Check how many line breaks are before the position
+      // Check if position falls within this piece's range (half-open interval)
+      if (position >= currentPos && position < pieceEnd) {
         const offsetInPiece = position - currentPos;
-
-        // Return the piece index and the offset within that piece
-
         return {
           pieceIndex: i,
           offsetInPiece: offsetInPiece,
         };
       }
-      currentPos += piece.length; // Adjust for line breaks
+
+      // Move to next piece
+      currentPos = pieceEnd;
     }
 
-    // Should only happen if position === this.length and the last piece has length > 0
+    // Special case: position is at the very end of the document
     if (position === this.length) {
       return {
         pieceIndex: this.pieces.length - 1,
@@ -352,6 +390,133 @@ export class PieceTable {
       };
     }
 
-    return { pieceIndex: -1, offsetInPiece: 0 }; // Not found (e.g., empty doc)
+    // Position is out of bounds or document is empty
+    return { pieceIndex: -1, offsetInPiece: 0 };
   }
+
+  /**
+   * Modifies a piece by either keeping or deleting a specified range.
+   *
+   * This function handles various cases based on the position of the range:
+   *
+   * ```
+   * 1: Keep mode             2: Delete start            3: Delete end             4: Delete middle
+   * ┌────── Piece ─────┐     ┌────── Piece ─────┐       ┌────── Piece ─────┐     ┌──────── Piece ────────┐
+   *      ┌─ range ─┐         ┌─ range ─┐                      ┌─ range ─┐             ┌─── range ───┐
+   *      │  KEEP   │         │ DELETE  │  KEEP           KEEP │ DELETE  │        KEEP │   DELETE    │ KEEP
+   *      └─────────┘         └─────────┘                      └─────────┘             └─────────────┘
+   *
+   * ```
+   
+   *
+   * @param pieceIndex The index of the piece in the pieces array to modify
+   * @param range A tuple [start, end] with the character positions relative to the piece
+   * @param mode 'keep' to keep only the specified range, 'delete' to remove it
+   * @private
+   */
+  private _truncatePiece(pieceIndex: number, range: [number, number], mode: 'keep' | 'delete') {
+    // Validate pieceIndex is within array bounds
+    if (pieceIndex < 0 || pieceIndex >= this.pieces.length) {
+      throw new Error(`truncation: invalid pieceIndex ${pieceIndex}`);
+    }
+
+    const piece = this.pieces[pieceIndex];
+    let [start, end] = range;
+
+    // Normalize inputs
+    if (start < 0) start = 0;
+    if (end > piece.length) end = piece.length;
+
+    if (start > end) {
+      throw new Error('truncation: range is invalid');
+    }
+
+    this._version++;
+
+    // 1. KEEP MODE: Keep only the specified range, discard everything else
+    if (mode === 'keep') {
+      if (start >= end) {
+        // Empty range to keep, delete the whole piece
+        this.pieces.splice(pieceIndex, 1);
+        this._length -= piece.length;
+        return;
+      }
+
+      // Create a new piece with just the range we want to keep
+      const newPiece: Piece = {
+        offset: piece.offset + start, // Adjust offset to point to the start of our range
+        source: piece.source,
+        length: end - start, // Only keep the specified range length
+      };
+
+      this.pieces[pieceIndex] = newPiece;
+      this._length -= piece.length - newPiece.length; // Update document length
+      return;
+    }
+
+    // 2. DELETE MODE: Remove the specified range, keep everything else
+
+    // Case 2A: Remove the entire piece
+    console.log('Deleting entire piece');
+    if (start === 0 && end === piece.length) {
+      this.pieces.splice(pieceIndex, 1);
+      this._length -= piece.length;
+      return; // Added return to prevent fallthrough
+    }
+
+    // Case 2B: Range to delete is at the start of the piece
+    if (start === 0) {
+      // Keep only the text after the deleted range
+      const secondPart: Piece = {
+        offset: piece.offset + end, // Skip past the deleted section
+        length: piece.length - end, // Keep the remaining length
+        source: piece.source,
+      };
+
+      this.pieces[pieceIndex] = secondPart;
+      this._length -= end - start; // Update document length
+      return;
+    }
+
+    // Case 2C: Range to delete is at the end of the piece
+    if (end === piece.length) {
+      // Keep only the text before the deleted range
+      const firstPart: Piece = {
+        offset: piece.offset, // Keep the original offset
+        length: start, // Truncate to just before deleted range
+        source: piece.source,
+      };
+      this.pieces[pieceIndex] = firstPart;
+      this._length -= end - start; // Update document length
+      return;
+    }
+
+    // Case 2D: Range to delete is in the middle - split into two pieces
+
+    // Piece before the deleted range
+    const beforePiece: Piece = {
+      source: piece.source,
+      offset: piece.offset, // Keep original offset
+      length: start, // Length until deleted section starts
+    };
+
+    // Piece after the deleted range
+    const afterPiece: Piece = {
+      source: piece.source,
+      offset: piece.offset + end, // Skip past deleted section
+      length: piece.length - end, // Keep remaining text
+    };
+
+    // Replace original piece with the two new pieces
+    this.pieces.splice(pieceIndex, 1, beforePiece, afterPiece);
+    this._length -= end - start; // Update document length
+  }
+
+  /**
+   * Splits a piece into two pieces at the specified index.
+   * @param piece The piece to split
+   * @param splitIndex The character index at which to split the piece
+   * @returns An object containing the two resulting pieces
+   * @private
+   */
 }

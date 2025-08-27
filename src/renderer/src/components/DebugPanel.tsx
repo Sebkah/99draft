@@ -34,7 +34,7 @@ const DebugPanel: React.FC<DebugPanelProps> = ({
   const [collapsedSections, setCollapsedSections] = useState({
     cursor: true,
     buffer: true,
-    structure: true,
+    structure: false,
   });
 
   // State for the whole panel

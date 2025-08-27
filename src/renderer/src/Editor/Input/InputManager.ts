@@ -1,5 +1,6 @@
 import { Editor } from '../Editor';
 import { PieceTable } from '../PieceTable/PieceTable';
+
 import { TextRenderer } from '../TextRenderer';
 
 /**
@@ -8,7 +9,7 @@ import { TextRenderer } from '../TextRenderer';
  */
 export class InputManager {
   private pieceTable: PieceTable;
-  private cursorPosition:number ;
+  private cursorPosition: number;
   private textRenderer: TextRenderer;
 
   private editor: Editor;
@@ -17,18 +18,17 @@ export class InputManager {
     pieceTable: PieceTable,
     cursorPosition: number,
     textRenderer: TextRenderer,
+
     editor: Editor,
   ) {
     this.pieceTable = pieceTable;
     this.cursorPosition = cursorPosition;
     this.textRenderer = textRenderer;
     this.editor = editor;
-
   }
 
   private lastLeftArrowTime: number | null = null;
   private lastRightArrowTime: number | null = null;
-
 
   private numberOfLeftArrowPresses: number = 0;
   private numberOfRightArrowPresses: number = 0;
@@ -120,6 +120,23 @@ export class InputManager {
       return true;
     }
 
+    if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
+      let newCursorPosition: number;
+      if (event.key === 'ArrowUp') {
+        newCursorPosition = this.textRenderer._textParser.getLineAdjacentCursorPosition(
+          this.cursorPosition,
+          'above',
+        );
+      } else {
+        newCursorPosition = this.textRenderer._textParser.getLineAdjacentCursorPosition(
+          this.cursorPosition,
+          'below',
+        );
+      }
+      this.cursorPosition = newCursorPosition;
+      this.textRenderer.setCursorPosition(this.cursorPosition);
+      this.textRenderer.render();
+    }
     // Handle printable character input
     if (event.key.length === 1 && !event.ctrlKey && !event.metaKey) {
       this.insertText(event.key);
@@ -138,7 +155,6 @@ export class InputManager {
   setCursorPosition(position: number): void {
     this.cursorPosition = Math.max(0, Math.min(this.pieceTable.length, position));
     this.textRenderer.setCursorPosition(this.cursorPosition);
- 
   }
 
   /**
@@ -155,10 +171,7 @@ export class InputManager {
    */
   insertText(text: string): void {
     this.pieceTable.insert(text, this.cursorPosition);
-    this.cursorPosition = Math.min(
-      this.pieceTable.length,
-      this.cursorPosition + text.length,
-    );
+    this.cursorPosition = Math.min(this.pieceTable.length, this.cursorPosition + text.length);
     this.textRenderer.setCursorPosition(this.cursorPosition);
     this.textRenderer.render();
     this.editor.triggerDebugUpdate();
