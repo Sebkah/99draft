@@ -228,7 +228,7 @@ export class PieceTable {
     // Merge with previous piece if the newly inserted add-piece abuts an earlier add-piece
     // insertionIndex > 0 ensures there is a piece immediately to the left
     if (insertionIndex > 0) {
-      console.log('Merging with previous piece if possible');
+      /*   console.log('Merging with previous piece if possible'); */
       // prev is the piece immediately before the insertion point
       const prev = this.pieces[insertionIndex - 1];
       // curr is the newly inserted add-buffer piece at insertionIndex
@@ -248,7 +248,7 @@ export class PieceTable {
     // Merge with next piece if the newly inserted add-piece directly precedes another add-piece
     // insertionIndex < pieces.length - 1 ensures a neighbor exists on the right
     if (insertionIndex < this.pieces.length - 1) {
-      console.log('Merging with next piece if possible');
+      /* console.log('Merging with next piece if possible'); */
       // curr2 is the newly inserted (or merged) add-buffer piece
       const curr2 = this.pieces[insertionIndex];
       // next is the piece immediately after insertionIndex

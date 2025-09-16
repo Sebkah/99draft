@@ -21,6 +21,8 @@ export class TextParser {
   private _lastWrappingWidth: number = -1;
   private _ctx: CanvasRenderingContext2D;
 
+  public cursorPositionInStructure: [number, number, number] = [-1, -1, -1]; // [paragraphIndex, lineIndex, offsetInLineInPixels]
+
   constructor(pieceTable: PieceTable, ctx: CanvasRenderingContext2D) {
     this._pieceTable = pieceTable;
     this._ctx = ctx;
@@ -179,6 +181,7 @@ export class TextParser {
           ctx.measureText(lastLine.text).width,
         ];
       }
+      this.cursorPositionInStructure = renderedCursorPosition;
       return renderedCursorPosition;
     }
 
@@ -206,6 +209,7 @@ export class TextParser {
     if (!paragraph) {
       // Cursor position is out of bounds in the paragraphs
       renderedCursorPosition[1] = -1;
+      this.cursorPositionInStructure = renderedCursorPosition;
       return renderedCursorPosition;
     }
 
@@ -242,6 +246,7 @@ export class TextParser {
       renderedCursorPosition[2] = -1; // Cursor is not in any line
     }
 
+    this.cursorPositionInStructure = renderedCursorPosition;
     return renderedCursorPosition;
   }
 

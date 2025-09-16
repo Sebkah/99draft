@@ -15,7 +15,7 @@ const Canvas = () => {
   // Initialize editor with sample text
   const [editor] = useState(() => {
     return new Editor(
-      'Hello\n world!\n This is a piece   table example.\nYou can insert and delete text efficiently using this structure.\n Piece tables are great for text editors and similar applications. END OF ORIGINAL TEXT',
+      'Hello\n world!\n This is a piece   table example.\nYou can insert and delete text efficiently using this structure.\n Piece tables are great for text editors and similar applications. END OF ORIGINAL TEXT. You can insert and delete text efficiently using this structure. Piece tables are great for text editors and similar applications. END OF ORIGINAL TEXT.',
     );
   });
 

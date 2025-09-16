@@ -9,7 +9,7 @@ export class TextRenderer {
   private _leftMargin: number = 100;
   private _rightMargin: number = 100;
 
-  private _showDebugInfo: boolean = false;
+  private _showDebugInfo: boolean = true;
 
   // Getter for wrapping width
   private get wrappingWidth(): number {
@@ -42,7 +42,7 @@ export class TextRenderer {
     this._showDebugInfo = show;
   }
 
-  private _renderedCursorPosition: [number, number, number] = [-1, -1, -1]; // [paragraphIndex, lineIndex, offsetInLineInPixels]
+  /* private _renderedCursorPosition: [number, number, number] = [-1, -1, -1]; // [paragraphIndex, lineIndex, offsetInLineInPixels] */
 
   constructor(ctx: CanvasRenderingContext2D, pieceTable: PieceTable) {
     this.ctx = ctx;
@@ -81,16 +81,29 @@ export class TextRenderer {
     this.ctx.translate(0, lineHeight);
     paragraphs.forEach((paragraph, pindex) => {
       // Render paragraph debug info
+
+      const padding = 5;
+
+      const paragraphHeight = paragraph.lines.length * lineHeight;
+      const paragraphHeightWithoutPadding = paragraphHeight - padding * 2;
+
+      const paragraphMidHeight = paragraphHeightWithoutPadding / 2;
+
+      const paragraphTop = -lineHeight;
+
+      this.ctx.fillStyle = 'blue';
       this.ctx.fillText(
-        `Paragraph ${pindex} - offset ${paragraph.offset} - length ${paragraph.length}`,
-        800,
-        0,
+        `P ${pindex} - length ${paragraph.length}`,
+        810,
+        paragraphMidHeight - lineHeight / 2,
       );
+      this.ctx.fillStyle = paragraph.dirty ? 'red' : 'green';
+      this.ctx.fillRect(800, paragraphTop + padding, 4, paragraphHeightWithoutPadding); // Underline for paragraph info
 
       paragraph.lines.forEach((line) => {
         // Render line debug info
-        this.ctx.fillText(`offset ${line.offset}`, 10, 0);
-        this.ctx.fillText(`length ${line.length}`, 80, 0);
+        /* this.ctx.fillText(`offset ${line.offset}`, 10, 0);
+        this.ctx.fillText(`length ${line.length}`, 80, 0); */
 
         this.ctx.translate(0, lineHeight);
       });
@@ -102,8 +115,7 @@ export class TextRenderer {
 
   public setCursorPosition(position: number): void {
     this._textParser.parseIfNeeded(this.wrappingWidth);
-
-    this._renderedCursorPosition = this._textParser.mapCursorPosition(position, this.ctx);
+    this._textParser.mapCursorPosition(position, this.ctx);
   }
 
   public render(): void {
@@ -111,26 +123,27 @@ export class TextRenderer {
     const lineHeight = 20; // Height of each line
     this.ctx.clearRect(0, 0, this.ctx.canvas.width, this.ctx.canvas.height);
 
-    // Parse text only if needed (when text changes or width changes)
+    /*   // Parse text only if needed (when text changes or width changes)
     const didReparse = this._textParser.parseIfNeeded(this.wrappingWidth);
     if (didReparse) {
       console.log('Text was reparsed');
     }
-
+ */
     this.ctx.save();
 
     // Set base text style for all text rendering
     this.setBaseTextStyle();
 
     const paragraphs = this._textParser.getParagraphs();
+
     paragraphs.forEach((paragraph, pindex) => {
       paragraph.lines.forEach((line, lindex) => {
         if (
-          this._renderedCursorPosition[0] === pindex &&
-          this._renderedCursorPosition[1] === lindex
+          this._textParser.cursorPositionInStructure[0] === pindex &&
+          this._textParser.cursorPositionInStructure[1] === lindex
         ) {
           this.ctx.fillRect(
-            this._renderedCursorPosition[2] + leftMargin,
+            this._textParser.cursorPositionInStructure[2] + leftMargin,
             0,
             2, // Cursor width
             lineHeight,
