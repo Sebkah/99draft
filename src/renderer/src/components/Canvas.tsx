@@ -3,6 +3,9 @@ import DebugPanel from './DebugPanel';
 import Ruler from './Ruler';
 
 import React, { useEffect, useRef, useState } from 'react';
+import { baseText } from '@renderer/assets/baseText';
+
+const editorWidth = 1000;
 
 /**
  * Canvas component that implements a text editor using piece table data structure
@@ -12,16 +15,11 @@ const Canvas = () => {
   // Refs for DOM elements
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
-  // Initialize editor with sample text
-  const [editor] = useState(() => {
-    return new Editor(
-      'Hello\n world!\n This is a piece   table example.\nYou can insert and delete text efficiently using this structure.\n Piece tables are great for text editors and similar applications. END OF ORIGINAL TEXT. You can insert and delete text efficiently using this structure. Piece tables are great for text editors and similar applications. END OF ORIGINAL TEXT.',
-    );
-  });
+  const [editor, setEditor] = useState<Editor | null>(null);
 
   // Layout/rendering state
   const [leftMargin, setLeftMargin] = useState<number>(50);
-  const [rightMargin, setRightMargin] = useState<number>(750);
+  const [rightMargin, setRightMargin] = useState<number>(450);
 
   // Debug state
   const [piecesForDebug, setPieces] = useState<PieceDebug[]>([]);
@@ -37,26 +35,19 @@ const Canvas = () => {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    // Initialize editor with canvas context
-    editor.initialize(ctx);
-
-    // Set initial margins
-    editor.setMargins(leftMargin, rightMargin);
-
+    setEditor(new Editor(baseText, ctx, { left: leftMargin, right: rightMargin }));
     // Focus the canvas for keyboard input
     canvas.focus();
-
-    // Start debug information updates
-    editor.startDebugUpdates(setPieces);
-
-
-  }, [editor, leftMargin, rightMargin]);
-
-  // Cleanup effect for component unmount
-  useEffect(() => {
+    // Cleanup on unmount
     return () => {
-      editor.dispose();
+      if (editor) editor.dispose();
     };
+  }, []);
+
+  useEffect(() => {
+    if (editor) {
+      editor.startDebugUpdates(setPieces);
+    }
   }, [editor]);
 
   /**
@@ -64,6 +55,7 @@ const Canvas = () => {
    * @param event - React keyboard event from canvas element
    */
   const handleKeyDown = (event: React.KeyboardEvent<HTMLCanvasElement>) => {
+    if (!editor) return;
     const handled = editor.handleKeyDown(event.nativeEvent);
     if (handled) {
       event.preventDefault();
@@ -75,6 +67,7 @@ const Canvas = () => {
    */
   const handleLeftMarginChange = (newLeftMargin: number) => {
     setLeftMargin(newLeftMargin);
+    if (!editor) return;
     editor.setMargins(newLeftMargin, rightMargin);
   };
 
@@ -83,6 +76,7 @@ const Canvas = () => {
    */
   const handleRightMarginChange = (newRightMargin: number) => {
     setRightMargin(newRightMargin);
+    if (!editor) return;
     editor.setMargins(leftMargin, newRightMargin);
   };
 
@@ -91,7 +85,7 @@ const Canvas = () => {
       {/* Main text editor canvas */}
       <div className=" h-full">
         <Ruler
-          width={1000}
+          width={editorWidth}
           leftMargin={leftMargin}
           rightMargin={rightMargin}
           onLeftMarginChange={handleLeftMarginChange}
@@ -100,7 +94,7 @@ const Canvas = () => {
         <canvas
           ref={canvasRef}
           tabIndex={0} // Make canvas focusable for keyboard input
-          width={1000}
+          width={editorWidth}
           height={400}
           onKeyDown={handleKeyDown}
           className="bg-white pointer-events-auto shadow-lg focus:outline-none "
@@ -108,12 +102,15 @@ const Canvas = () => {
       </div>
 
       {/* Debug panel positioned at bottom right */}
-      <DebugPanel
-        cursorPosition={editor.getCursorPosition()}
-        pieceTable={editor.getPieceTable()}
-        textRenderer={editor.getTextRenderer()}
-        piecesForDebug={piecesForDebug}
-      />
+      {editor && (
+        <DebugPanel
+          cursorPosition={editor.getCursorPosition()}
+          pieceTable={editor.getPieceTable()}
+          textRenderer={editor.getTextRenderer()}
+          textParser={editor.getTextParser()}
+          piecesForDebug={piecesForDebug}
+        />
+      )}
     </>
   );
 };

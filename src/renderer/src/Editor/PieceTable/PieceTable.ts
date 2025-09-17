@@ -105,6 +105,49 @@ export class PieceTable {
       .join('');
   }
 
+  public getRangeText(start: number, length: number): string {
+    const end = Math.min(start + length, this._length);
+    if (start < 0 || length <= 0 || start >= this._length || start >= end || end > this._length) {
+      console.warn('getRangeText: invalid range');
+      return '';
+    }
+
+    // Find the piece containing the start position
+    const { pieceIndex, offsetInPiece } = this._findPiece(start);
+
+    // Find the piece containing the end position
+    const { pieceIndex: endPieceIndex, offsetInPiece: endPieceOffset } = this._findPiece(end);
+
+    if (pieceIndex === -1 || endPieceIndex === -1) {
+      console.warn('getRangeText: position out of bounds');
+      return '';
+    }
+    const result: string[] = [];
+    // If the range is within a single piece
+    if (pieceIndex === endPieceIndex) {
+      const piece = this.pieces[pieceIndex];
+      const buffer = piece.source === 'original' ? this.originalBuffer : this.addBuffer;
+      result.push(buffer.substring(piece.offset + offsetInPiece, piece.offset + endPieceOffset));
+      return result.join('');
+    }
+    // Range spans multiple pieces
+    // Handle the first piece (from offsetInPiece to end of piece)
+    let piece = this.pieces[pieceIndex];
+    let buffer = piece.source === 'original' ? this.originalBuffer : this.addBuffer;
+    result.push(buffer.substring(piece.offset + offsetInPiece, piece.offset + piece.length));
+    // Handle any full pieces in between
+    for (let i = pieceIndex + 1; i < endPieceIndex; i++) {
+      piece = this.pieces[i];
+      buffer = piece.source === 'original' ? this.originalBuffer : this.addBuffer;
+      result.push(buffer.substring(piece.offset, piece.offset + piece.length));
+    }
+    // Handle the last piece (from start of piece to endPieceOffset)
+    piece = this.pieces[endPieceIndex];
+    buffer = piece.source === 'original' ? this.originalBuffer : this.addBuffer;
+    result.push(buffer.substring(piece.offset, piece.offset + endPieceOffset));
+    return result.join('');
+  }
+
   public getPieceText(piece: Piece): string {
     const buffer = piece.source === 'original' ? this.originalBuffer : this.addBuffer;
     return buffer.substring(piece.offset, piece.offset + piece.length);
@@ -113,6 +156,16 @@ export class PieceTable {
   public getPieces(): Piece[] {
     return this.pieces;
   }
+
+  /**
+   * Gets text within a specific range without reconstructing the entire document.
+   * This is more efficient than getText() when you only need a portion of the text.
+   *
+   * @param startOffset The starting character position (inclusive)
+   * @param endOffset The ending character position (exclusive)
+   * @returns The text within the specified range
+   */
+
 
   /**
    * Updates the document length and add buffer length tracking.

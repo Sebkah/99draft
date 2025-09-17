@@ -1,37 +1,15 @@
-import { PieceTable } from './PieceTable/PieceTable';
+import { Editor } from './Editor';
 import { TextParser } from './TextParser';
 
 export class TextRenderer {
   private ctx: CanvasRenderingContext2D;
 
-  public _textParser: TextParser;
-
-  private _leftMargin: number = 100;
-  private _rightMargin: number = 100;
+  private _textParser: TextParser;
+  private _editor: Editor;
 
   private _showDebugInfo: boolean = true;
 
-  // Getter for wrapping width
-  private get wrappingWidth(): number {
-    return this.ctx.canvas.width - this._leftMargin - this._rightMargin;
-  }
-
-  // Getters and setters for margins
-  public get leftMargin(): number {
-    return this._leftMargin;
-  }
-
-  public set leftMargin(margin: number) {
-    this._leftMargin = margin;
-  }
-
-  public get rightMargin(): number {
-    return this._rightMargin;
-  }
-
-  public set rightMargin(margin: number) {
-    this._rightMargin = margin;
-  }
+  private justifyText: boolean = false;
 
   // Getter and setter for debug info
   public get showDebugInfo(): boolean {
@@ -42,11 +20,10 @@ export class TextRenderer {
     this._showDebugInfo = show;
   }
 
-  /* private _renderedCursorPosition: [number, number, number] = [-1, -1, -1]; // [paragraphIndex, lineIndex, offsetInLineInPixels] */
-
-  constructor(ctx: CanvasRenderingContext2D, pieceTable: PieceTable) {
+  constructor(ctx: CanvasRenderingContext2D, textParser: TextParser, editor: Editor) {
     this.ctx = ctx;
-    this._textParser = new TextParser(pieceTable, ctx);
+    this._textParser = textParser;
+    this._editor = editor;
 
     this.ctx.font = '16px Arial';
   }
@@ -113,22 +90,11 @@ export class TextRenderer {
     this.ctx.restore();
   }
 
-  public setCursorPosition(position: number): void {
-    this._textParser.parseIfNeeded(this.wrappingWidth);
-    this._textParser.mapCursorPosition(position, this.ctx);
-  }
-
   public render(): void {
-    const leftMargin = this.leftMargin; // Left margin for the text
+    const leftMargin = this._editor.margins.left; // Left margin for the text
     const lineHeight = 20; // Height of each line
     this.ctx.clearRect(0, 0, this.ctx.canvas.width, this.ctx.canvas.height);
 
-    /*   // Parse text only if needed (when text changes or width changes)
-    const didReparse = this._textParser.parseIfNeeded(this.wrappingWidth);
-    if (didReparse) {
-      console.log('Text was reparsed');
-    }
- */
     this.ctx.save();
 
     // Set base text style for all text rendering
@@ -138,16 +104,27 @@ export class TextRenderer {
 
     paragraphs.forEach((paragraph, pindex) => {
       paragraph.lines.forEach((line, lindex) => {
+        // Render cursor if it's in the current line
         if (
           this._textParser.cursorPositionInStructure[0] === pindex &&
           this._textParser.cursorPositionInStructure[1] === lindex
         ) {
           this.ctx.fillRect(
-            this._textParser.cursorPositionInStructure[2] + leftMargin,
+            this._textParser.cursorPositionInStructure[3] + leftMargin,
             0,
             2, // Cursor width
             lineHeight,
           );
+        }
+
+        if (this.justifyText) {
+          const lineLenghtRest = this._editor.wrappingWidth - line.pixelLength;
+          const spaceCount = (line.text.match(/ /g) || []).length;
+          const distributeSpace = spaceCount > 0 ? lineLenghtRest / spaceCount : 0;
+
+          if (distributeSpace < 10) {
+            this.ctx.wordSpacing = distributeSpace + 'px';
+          }
         }
 
         this.ctx.translate(0, lineHeight);

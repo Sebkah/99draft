@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { PieceTable } from '@renderer/Editor/PieceTable/PieceTable';
 import { TextRenderer } from '@renderer/Editor/TextRenderer';
 import { motion } from 'framer-motion';
+import { TextParser } from '@renderer/Editor/TextParser';
 
 /**
  * Type definition for debugging piece table structure
@@ -17,6 +18,7 @@ interface DebugPanelProps {
   cursorPosition: number;
   pieceTable: PieceTable | null;
   textRenderer: TextRenderer | null;
+  textParser: TextParser | null;
   piecesForDebug: PieceDebug[];
 }
 
@@ -28,13 +30,14 @@ const DebugPanel: React.FC<DebugPanelProps> = ({
   cursorPosition,
   pieceTable,
   textRenderer,
+  textParser,
   piecesForDebug,
 }) => {
   // State for collapsible sections
   const [collapsedSections, setCollapsedSections] = useState({
-    cursor: true,
+    cursor: false,
     buffer: true,
-    structure: false,
+    structure: true,
   });
 
   // State for the whole panel
@@ -104,26 +107,32 @@ const DebugPanel: React.FC<DebugPanelProps> = ({
                 </div>
 
                 {/* Rendering position info */}
-                {textRenderer && (
+                {textParser && (
                   <div className="bg-gray-700 rounded p-1.5 border border-orange-400/30">
-                    <div className="grid grid-cols-3 gap-1 text-xs">
+                    <div className="grid grid-cols-4 gap-1 text-xs">
                       <div className="flex flex-col items-center">
                         <span className="text-orange-400 font-medium text-xs">
-                          {(textRenderer as any)._renderedCursorPosition[0]}
+                          {textParser.cursorPositionInStructure[0]}
                         </span>
                         <span className="text-gray-400 text-xs">Para</span>
                       </div>
                       <div className="flex flex-col items-center">
                         <span className="text-cyan-400 font-medium text-xs">
-                          {(textRenderer as any)._renderedCursorPosition[1]}
+                          {textParser.cursorPositionInStructure[1]}
                         </span>
                         <span className="text-gray-400 text-xs">Line</span>
                       </div>
                       <div className="flex flex-col items-center">
                         <span className="text-pink-400 font-medium text-xs">
-                          {(textRenderer as any)._renderedCursorPosition[2]}px
+                          {textParser.cursorPositionInStructure[2]}
                         </span>
-                        <span className="text-gray-400 text-xs">Off</span>
+                        <span className="text-gray-400 text-xs">Char</span>
+                      </div>
+                      <div className="flex flex-col items-center">
+                        <span className="text-red-400 font-medium text-xs">
+                          {textParser.cursorPositionInStructure[3]}px
+                        </span>
+                        <span className="text-gray-400 text-xs">Px Offset</span>
                       </div>
                     </div>
                   </div>
@@ -194,7 +203,19 @@ const DebugPanel: React.FC<DebugPanelProps> = ({
                         </div>
                       </div>
                       <div className="font-mono text-xs text-gray-300 bg-gray-900 rounded p-1 border border-gray-600/30">
-                        "{piece.text || '<empty>'}"
+                        "
+                        {piece.text
+                          ? piece.text.split(/(\r\n|\r|\n)/).map((part, i) =>
+                              /^(?:\r\n|\r|\n)$/u.test(part) ? (
+                                <span key={i} className="text-yellow-300">
+                                  {'\\n'}
+                                </span>
+                              ) : (
+                                <span key={i}>{part}</span>
+                              ),
+                            )
+                          : '<empty>'}
+                        "
                       </div>
                     </div>
                   ))}

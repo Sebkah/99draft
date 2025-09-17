@@ -3,7 +3,9 @@ import RulerPin from './RulerPin';
 
 interface RulerProps {
   width: number;
+  // leftMargin: pixels from left edge
   leftMargin: number;
+  // rightMargin: pixels from right edge
   rightMargin: number;
   onLeftMarginChange: (position: number) => void;
   onRightMarginChange: (position: number) => void;
@@ -20,8 +22,8 @@ const Ruler: React.FC<RulerProps> = ({
   onLeftMarginChange,
   onRightMarginChange,
 }) => {
-  const [isDraggingLeft, setIsDraggingLeft] = useState(false);
-  const [isDraggingRight, setIsDraggingRight] = useState(false);
+  // single dragging state: 'left' | 'right' | null
+  const [dragging, setDragging] = useState<'left' | 'right' | null>(null);
   const rulerRef = useRef<HTMLDivElement>(null);
 
   /**
@@ -42,7 +44,7 @@ const Ruler: React.FC<RulerProps> = ({
    */
   const handleLeftPinMouseDown = useCallback((event: React.MouseEvent) => {
     event.preventDefault();
-    setIsDraggingLeft(true);
+    setDragging('left');
   }, []);
 
   /**
@@ -50,7 +52,7 @@ const Ruler: React.FC<RulerProps> = ({
    */
   const handleRightPinMouseDown = useCallback((event: React.MouseEvent) => {
     event.preventDefault();
-    setIsDraggingRight(true);
+    setDragging('right');
   }, []);
 
   /**
@@ -58,36 +60,36 @@ const Ruler: React.FC<RulerProps> = ({
    */
   const handleMouseMove = useCallback(
     (event: MouseEvent) => {
-      if (isDraggingLeft) {
-        const newPosition = getPositionFromEvent(event);
-        onLeftMarginChange(Math.min(newPosition, rightMargin - 20)); // Keep 20px minimum gap
-      } else if (isDraggingRight) {
-        const newPosition = getPositionFromEvent(event);
-        onRightMarginChange(Math.max(newPosition, leftMargin + 20)); // Keep 20px minimum gap
+      const pos = getPositionFromEvent(event);
+      // Convert pos (pixels from left) to left/right margins
+      const rightPos = width - pos; // pixels from right edge
+
+      const minGap = 20;
+      if (dragging === 'left') {
+        // new left margin must be <= width - rightMargin - minGap
+        const maxLeft = width - rightMargin - minGap;
+        const newLeft = Math.max(0, Math.min(pos, maxLeft));
+        onLeftMarginChange(newLeft);
+      } else if (dragging === 'right') {
+        // rightMargin is distance from right edge. newRight must be <= width - leftMargin - minGap
+        const maxRight = width - leftMargin - minGap;
+        const newRight = Math.max(0, Math.min(rightPos, maxRight));
+        onRightMarginChange(newRight);
       }
     },
-    [
-      isDraggingLeft,
-      isDraggingRight,
-      getPositionFromEvent,
-      onLeftMarginChange,
-      onRightMarginChange,
-      leftMargin,
-      rightMargin,
-    ],
+    [dragging, getPositionFromEvent, onLeftMarginChange, onRightMarginChange, leftMargin, rightMargin, width],
   );
 
   /**
    * Handle mouse up to stop dragging
    */
   const handleMouseUp = useCallback(() => {
-    setIsDraggingLeft(false);
-    setIsDraggingRight(false);
+    setDragging(null);
   }, []);
 
   // Add global mouse event listeners when dragging
   React.useEffect(() => {
-    if (isDraggingLeft || isDraggingRight) {
+    if (dragging) {
       document.addEventListener('mousemove', handleMouseMove);
       document.addEventListener('mouseup', handleMouseUp);
 
@@ -97,7 +99,7 @@ const Ruler: React.FC<RulerProps> = ({
       };
     }
     return undefined;
-  }, [isDraggingLeft, isDraggingRight, handleMouseMove, handleMouseUp]);
+  }, [dragging, handleMouseMove, handleMouseUp]);
 
   /**
    * Generate ruler tick marks
@@ -151,15 +153,15 @@ const Ruler: React.FC<RulerProps> = ({
       {/* Left margin pin */}
       <RulerPin
         position={leftMargin}
-        isDragging={isDraggingLeft}
+        isDragging={dragging === 'left'}
         onMouseDown={handleLeftPinMouseDown}
         title={`Left margin: ${Math.round(leftMargin)}px`}
       />
 
-      {/* Right margin pin */}
+      {/* Right margin pin (position measured from left) */}
       <RulerPin
-        position={rightMargin}
-        isDragging={isDraggingRight}
+        position={width - rightMargin}
+        isDragging={dragging === 'right'}
         onMouseDown={handleRightPinMouseDown}
         title={`Right margin: ${Math.round(rightMargin)}px`}
       />
