@@ -1,13 +1,6 @@
 import { Editor } from './Editor';
 import { PieceTable } from './PieceTable/PieceTable';
-
-export type Paragraph = {
-  dirty: boolean;
-  text: string;
-  offset: number;
-  length: number;
-  lines: Line[];
-};
+import { Paragraph } from './Paragraph';
 
 /**
  * Represents a line of text with associated metadata.
@@ -27,7 +20,6 @@ export type Line = {
 export class TextParser {
   private _pieceTable: PieceTable;
   private _paragraphs: Paragraph[] = [];
-  private _lastWrappingWidth: number = -1;
   private _ctx: CanvasRenderingContext2D;
   private _editor: Editor;
 
@@ -40,35 +32,38 @@ export class TextParser {
 
     this.splitIntoParagraphs();
 
-    this.parseLines();
+    this.splitAllParagraphsIntoLines();
   }
 
   public getParagraphs(): Paragraph[] {
     return this._paragraphs;
   }
 
-  public parseLines(): void {
+  public splitAllParagraphsIntoLines(): void {
     this._paragraphs.forEach((paragraph, i) => {
-      if (paragraph.dirty || this._lastWrappingWidth != this._editor.wrappingWidth) {
-        console.log('Parsing dirty paragraph:', i);
-        this.splitParagraphIntoLines(paragraph);
-      } // Skip clean paragraphs
+      console.log('Parsing paragraph:', i);
+      this.splitParagraphIntoLines(paragraph);
     });
-    this._lastWrappingWidth = this._editor.wrappingWidth;
   }
 
-  public reparseParagraph(paragraphIndex: number, editLength: number): void {
+  /*
+  editLength is needed to adjust offsets of subsequent paragraphs and 
+  to know where to look in the piece table for the updated text 
+*/
+  public reparseParagraph(position: number, editLength: number): void {
+    const paragraphIndex = this.findParagraphIndexAtOffset(position);
     console.log('Parsing single paragraph:', paragraphIndex, 'edit length:', editLength);
+
     const paragraph = this._paragraphs[paragraphIndex];
     if (!paragraph) return;
 
     // Update paragraph length
-    paragraph.length += editLength;
-    paragraph.text = this._pieceTable.getRangeText(paragraph.offset, paragraph.length);
+    paragraph.updateLength(editLength);
+    paragraph.updateText(this._pieceTable.getRangeText(paragraph.offset, paragraph.length));
 
     // Shift offsets for all subsequent paragraphs
     for (let i = paragraphIndex + 1; i < this._paragraphs.length; i++) {
-      this._paragraphs[i].offset += editLength;
+      this._paragraphs[i].shiftOffset(editLength);
     }
 
     this.splitParagraphIntoLines(paragraph);
@@ -95,30 +90,16 @@ export class TextParser {
           // End current paragraph (length is already correct)
           currentOffset += 1; // Account for newline
           // Start a new empty paragraph
-          this._paragraphs.push({
-            text: '',
-            dirty: true,
-            offset: currentOffset,
-            length: 0,
-            lines: [],
-          });
+          this._paragraphs.push(new Paragraph('', currentOffset));
         } else if (token.length > 0) {
           // Text content
           if (this._paragraphs.length === 0) {
             // Start new paragraph
-            this._paragraphs.push({
-              text: token,
-              dirty: true,
-              offset: currentOffset,
-              length: token.length,
-              lines: [],
-            });
+            this._paragraphs.push(new Paragraph(token, currentOffset));
           } else {
             // Append to existing paragraph
             const lastParagraph = this._paragraphs[this._paragraphs.length - 1];
-            lastParagraph.text += token;
-            lastParagraph.length = lastParagraph.text.length; // Update length immediately
-            lastParagraph.dirty = true;
+            lastParagraph.appendText(token);
           }
           currentOffset += token.length;
         }
@@ -131,7 +112,7 @@ export class TextParser {
     const maxWidth = this._editor.wrappingWidth;
     // Split while preserving spaces
     const tokens = paragraph.text.split(/(\s+)/);
-    paragraph.lines = [];
+    const lines: Line[] = [];
 
     let offsetInParagraph = paragraph.offset;
     let currentLine = '';
@@ -146,7 +127,7 @@ export class TextParser {
           const testChar = currentLine + char;
           const charMetrics = this._ctx.measureText(testChar);
           if (charMetrics.width > maxWidth && currentLine.trim()) {
-            paragraph.lines.push({
+            lines.push({
               text: currentLine,
               offset: offsetInParagraph,
               length: currentLine.length,
@@ -162,7 +143,7 @@ export class TextParser {
       }
 
       if (metrics.width > maxWidth && currentLine.trim()) {
-        paragraph.lines.push({
+        lines.push({
           text: currentLine,
           offset: offsetInParagraph,
           length: currentLine.length,
@@ -175,14 +156,88 @@ export class TextParser {
       }
     });
 
-    paragraph.dirty = false; // Mark paragraph as clean after parsing
-
-    paragraph.lines.push({
+    lines.push({
       text: currentLine || '',
       offset: offsetInParagraph,
       length: currentLine.length,
       pixelLength: this._ctx.measureText(currentLine).width,
     });
+
+    paragraph.setLines(lines); // Use the new setLines method which also marks as clean
+  }
+
+  public findParagraphIndexAtOffset(offset: number): number {
+    for (let i = 0; i < this._paragraphs.length; i++) {
+      const paragraph = this._paragraphs[i];
+      if (offset >= paragraph.offset && offset < paragraph.offset + paragraph.length + 1) {
+        return i;
+      }
+    }
+    return -1; // Not found
+  }
+
+  public splitParagraph(cursorPosition: number): void {
+    const paragraphIndex = this.findParagraphIndexAtOffset(cursorPosition);
+
+    const currentParagraph = this._paragraphs[paragraphIndex];
+    const splitPosition = cursorPosition - currentParagraph.offset;
+
+    // Split the paragraph text
+    const beforeText = currentParagraph.text.substring(0, splitPosition);
+    const afterText = currentParagraph.text.substring(splitPosition);
+
+    // Update the current paragraph with the "before" text
+    currentParagraph.updateText(beforeText);
+    currentParagraph.updateLength(beforeText.length - currentParagraph.length);
+
+    // Create new paragraph with the "after" text
+    const newParagraph = new Paragraph(afterText, cursorPosition + 1);
+
+    // Insert the new paragraph after the current one
+    this._paragraphs.splice(paragraphIndex + 1, 0, newParagraph);
+
+    // Shift offsets for all subsequent paragraphs (starting from the one after the new paragraph)
+    for (let i = paragraphIndex + 2; i < this._paragraphs.length; i++) {
+      this._paragraphs[i].shiftOffset(1); // +1 for the newline character
+    }
+
+    // Only reparse the affected paragraphs into lines
+    this.splitParagraphIntoLines(currentParagraph);
+    this.splitParagraphIntoLines(newParagraph);
+  }
+
+  public deleteTextInParagraph(position: number, length: number): void {
+    const paragraphIndex = this.findParagraphIndexAtOffset(position);
+    if (paragraphIndex === -1) return;
+
+    const paragraph = this._paragraphs[paragraphIndex];
+    const newText = this._pieceTable.getRangeText(paragraph.offset, paragraph.length - length);
+
+    paragraph.updateText(newText);
+    paragraph.updateLength(-length);
+
+    // Shift offsets for subsequent paragraphs
+    for (let i = paragraphIndex + 1; i < this._paragraphs.length; i++) {
+      this._paragraphs[i].shiftOffset(-length);
+    }
+
+    // Only reparse the affected paragraph
+    this.splitParagraphIntoLines(paragraph);
+  }
+
+  public optimizedDelete(position: number, length: number): void {
+    // Get the text being deleted to check if it contains newlines
+    const deletedText = this._pieceTable.getRangeText(position, length);
+
+    if (deletedText.includes('\n')) {
+      // Complex case: deleting across paragraphs or multiple newlines
+      // For now, fall back to full reparse, but this could be optimized further
+      this.splitIntoParagraphs();
+      this.splitAllParagraphsIntoLines();
+    } else {
+      // Simple case: deleting within a paragraph
+      this.deleteTextInParagraph(position, length);
+    }
   }
 
   public mapPixelCoordinateToStructure(x: number, y: number): [number, number, number] {
@@ -217,7 +272,7 @@ export class TextParser {
   }
 
   // Map cursor position to paragraph, line, and pixel offset
-  public mapCursorPositionToStructure(cursorPosition: number, makeParagraphDirty = false): void {
+  public mapCursorPositionToStructure(cursorPosition: number): void {
     let renderedCursorPosition: [number, number, number, number] = [-1, -1, -1, -1]; // Reset cursor position
 
     // IF the cursor position is equal to the end of the document, we need to handle it specially
@@ -249,9 +304,6 @@ export class TextParser {
       // If the cursor is in the paragraph, set the index of the paragraph and break the loop
       if (isCursorInParagraph) {
         paragraphIndex = i;
-        if (makeParagraphDirty) {
-          paragraph.dirty = true;
-        }
         break;
       }
     }

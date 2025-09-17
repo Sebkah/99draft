@@ -74,7 +74,7 @@ export class TextRenderer {
         810,
         paragraphMidHeight - lineHeight / 2,
       );
-      this.ctx.fillStyle = paragraph.dirty ? 'red' : 'green';
+      this.ctx.fillStyle = 'green';
       this.ctx.fillRect(800, paragraphTop + padding, 4, paragraphHeightWithoutPadding); // Underline for paragraph info
 
       paragraph.lines.forEach((line) => {

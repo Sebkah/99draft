@@ -93,8 +93,8 @@ export class Editor {
     if (leftMargin !== undefined) this.margins.left = leftMargin;
     if (rightMargin !== undefined) this.margins.right = rightMargin;
 
-    this.textParser.parseLines();
-    this.textParser.mapCursorPositionToStructure(this.cursorPosition, false);
+    this.textParser.splitAllParagraphsIntoLines();
+    this.textParser.mapCursorPositionToStructure(this.cursorPosition);
     this.textRenderer.render();
   }
 
@@ -126,25 +126,32 @@ export class Editor {
   //TODO: enable inserting and deleting at arbitrary positions
 
   insertText(text: string): void {
+    if (text.includes('\n')) {
+      console.warn('Inserting text with newlines is not supported yet.');
+      return;
+    }
+
     this.pieceTable.insert(text, this.cursorPosition);
 
-    this.textParser.mapCursorPositionToStructure(this.cursorPosition, false);
-    this.textParser.reparseParagraph(this.textParser.cursorPositionInStructure[0], text.length);
+    this.textParser.reparseParagraph(this.cursorPosition, text.length);
 
     this.cursorPosition = Math.min(this.pieceTable.length, this.cursorPosition + text.length);
-    this.textParser.mapCursorPositionToStructure(this.cursorPosition, false);
 
+    this.textParser.mapCursorPositionToStructure(this.cursorPosition);
     this.textRenderer.render();
     this.triggerDebugUpdate();
   }
 
+  //TODO: this should also do partial reparsing, but we need to be carefull if we delete newlines
   deleteText(length: number): void {
     if (this.cursorPosition > 0) {
       this.pieceTable.delete(this.cursorPosition - 1, length);
       this.cursorPosition = Math.max(0, this.cursorPosition - length);
+
       this.textParser.splitIntoParagraphs();
-      this.textParser.parseLines();
-      this.textParser.mapCursorPositionToStructure(this.cursorPosition, false);
+      this.textParser.splitAllParagraphsIntoLines();
+
+      this.textParser.mapCursorPositionToStructure(this.cursorPosition);
       this.textRenderer.render();
       this.triggerDebugUpdate();
     }
@@ -152,10 +159,11 @@ export class Editor {
 
   insertLineBreak(): void {
     this.pieceTable.insert('\n', this.cursorPosition);
+    this.textParser.splitParagraph(this.cursorPosition);
+
     this.cursorPosition = Math.min(this.pieceTable.length, this.cursorPosition + 1);
-    this.textParser.splitIntoParagraphs();
-    this.textParser.parseLines();
-    this.textParser.mapCursorPositionToStructure(this.cursorPosition, false);
+
+    this.textParser.mapCursorPositionToStructure(this.cursorPosition);
     this.textRenderer.render();
     this.triggerDebugUpdate();
   }

@@ -166,7 +166,6 @@ export class PieceTable {
    * @returns The text within the specified range
    */
 
-
   /**
    * Updates the document length and add buffer length tracking.
    *
@@ -510,8 +509,8 @@ export class PieceTable {
     // 2. DELETE MODE: Remove the specified range, keep everything else
 
     // Case 2A: Remove the entire piece
-    console.log('Deleting entire piece');
     if (start === 0 && end === piece.length) {
+      console.log('Deleting entire piece');
       this.pieces.splice(pieceIndex, 1);
       this._length -= piece.length;
       return; // Added return to prevent fallthrough
