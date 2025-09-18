@@ -6,7 +6,7 @@ import { Paragraph } from './Paragraph';
  * Represents a line of text with associated metadata.
  *
  * @property text - The content of the line.
- * @property offset - The starting character offset of the line relative to the document.
+ * @property offset - The starting character offset of the line relative to the paragraph.
  * @property length - The number of characters in the line.
  * @property pixelLength - The rendered pixel width of the line.
  */
@@ -114,7 +114,7 @@ export class TextParser {
     const tokens = paragraph.text.split(/(\s+)/);
     const lines: Line[] = [];
 
-    let offsetInParagraph = paragraph.offset;
+    let offsetInParagraph = 0;
     let currentLine = '';
 
     tokens.forEach((token) => {
@@ -304,6 +304,7 @@ export class TextParser {
       // If the cursor is in the paragraph, set the index of the paragraph and break the loop
       if (isCursorInParagraph) {
         paragraphIndex = i;
+        console.log(paragraph);
         break;
       }
     }
@@ -325,6 +326,8 @@ export class TextParser {
     for (let j = 0; j < paragraph.lines.length; j++) {
       const line = paragraph.lines[j];
 
+      const cursorOffsetInParagraph = cursorPosition - paragraph.offset;
+
       const isOnlyLine = paragraph.lines.length === 1;
       const isLastLine = j === paragraph.lines.length - 1;
 
@@ -333,8 +336,8 @@ export class TextParser {
       let endOffsetDelta = isOnlyLine ? 1 : isLastLineButNotOnlyLine ? 1 : 0;
 
       if (
-        cursorPosition >= line.offset &&
-        cursorPosition < line.offset + line.length + endOffsetDelta
+        cursorOffsetInParagraph >= line.offset &&
+        cursorOffsetInParagraph < line.offset + line.length + endOffsetDelta
       ) {
         lineIndex = j;
         break;
@@ -344,8 +347,9 @@ export class TextParser {
 
     // 3. Calculate the offset within the line in pixels
     if (lineIndex !== -1) {
+      const cursorOffsetInParagraph = cursorPosition - paragraph.offset;
       const line = paragraph.lines[lineIndex];
-      const positionInLine = cursorPosition - line.offset;
+      const positionInLine = cursorOffsetInParagraph - line.offset;
       const textBeforeCursor = line.text.substring(0, positionInLine);
       const metrics = this._ctx.measureText(textBeforeCursor);
       renderedCursorPosition[2] = positionInLine; // Character index within the line

@@ -54,6 +54,7 @@ export class TextRenderer {
     this.ctx.font = '12px Arial';
 
     const paragraphs = this._textParser.getParagraphs();
+    const position = this.ctx.canvas.width - this._editor.margins.right;
 
     this.ctx.translate(0, lineHeight);
     paragraphs.forEach((paragraph, pindex) => {
@@ -70,17 +71,28 @@ export class TextRenderer {
 
       this.ctx.fillStyle = 'blue';
       this.ctx.fillText(
-        `P ${pindex} - length ${paragraph.length}`,
-        810,
-        paragraphMidHeight - lineHeight / 2,
+        `P${pindex} - l ${paragraph.length}`,
+        position + 10,
+        paragraphMidHeight - lineHeight / 2 + padding,
       );
+      this.ctx.fillText(
+        ` o ${paragraph.offset}`,
+        position + 80,
+        paragraphMidHeight - lineHeight / 2 + padding,
+      );
+      this.ctx.fillText(
+        ` e ${paragraph.offset + paragraph.length}`,
+        position + 170,
+        paragraphMidHeight - lineHeight / 2 + padding,
+      );
+
       this.ctx.fillStyle = 'green';
-      this.ctx.fillRect(800, paragraphTop + padding, 4, paragraphHeightWithoutPadding); // Underline for paragraph info
+      this.ctx.fillRect(position, paragraphTop + padding * 2, 4, paragraphHeightWithoutPadding); // Underline for paragraph info
 
       paragraph.lines.forEach((line) => {
         // Render line debug info
-        /* this.ctx.fillText(`offset ${line.offset}`, 10, 0);
-        this.ctx.fillText(`length ${line.length}`, 80, 0); */
+        this.ctx.fillText(`offset ${line.offset}`, 10, 0);
+        this.ctx.fillText(`length ${line.length}`, 80, 0);
 
         this.ctx.translate(0, lineHeight);
       });

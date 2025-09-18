@@ -18,7 +18,7 @@ const Canvas = () => {
   const [editor, setEditor] = useState<Editor | null>(null);
 
   // Layout/rendering state
-  const [leftMargin, setLeftMargin] = useState<number>(50);
+  const [leftMargin, setLeftMargin] = useState<number>(140);
   const [rightMargin, setRightMargin] = useState<number>(450);
 
   // Debug state
