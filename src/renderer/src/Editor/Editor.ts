@@ -14,6 +14,17 @@ export type PieceDebug = {
 };
 
 /**
+ * Debug configuration for controlling visibility of different debug visualizations
+ */
+export interface DebugConfig {
+  showWordOffsets: boolean;
+  showLineInfo: boolean;
+  showParagraphBounds: boolean;
+  showCursor: boolean;
+  wordDisplayMode: 'index' | 'charOffset' | 'pixelOffset';
+}
+
+/**
  * Editor class that manages all text editing functionality
  * Coordinates between PieceTable, TextRenderer, and InputManager
  */
@@ -25,6 +36,7 @@ export class Editor {
   public cursorPosition: number;
 
   public margins: { left: number; right: number };
+  public debugConfig: DebugConfig;
 
   private canvas: HTMLCanvasElement | null = null;
   private debugUpdateCallback?: (pieces: PieceDebug[]) => void;
@@ -44,11 +56,20 @@ export class Editor {
     this.pieceTable = new PieceTable(initialText);
 
     // Initialize cursor position at end of text
-    this.cursorPosition = this.pieceTable.length;
+    this.cursorPosition = Math.floor(this.pieceTable.length / 2);
 
     // Store canvas reference
     this.canvas = ctx.canvas;
     this.margins = margins;
+
+    // Initialize debug configuration with default values
+    this.debugConfig = {
+      showWordOffsets: true,
+      showLineInfo: true,
+      showParagraphBounds: true,
+      showCursor: true,
+      wordDisplayMode: 'charOffset',
+    };
 
     // Initialize text renderer and input manager
     this.textParser = new TextParser(this.pieceTable, ctx, this);

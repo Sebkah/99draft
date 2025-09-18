@@ -1,5 +1,5 @@
-import { Editor, PieceDebug } from '@renderer/Editor/Editor';
-import DebugPanel from './DebugPanel';
+import { Editor } from '@renderer/Editor/Editor';
+import DebugPanelNew from './DebugPanelNew';
 import Ruler from './Ruler';
 
 import React, { useEffect, useRef, useState } from 'react';
@@ -21,9 +21,6 @@ const Canvas = () => {
   const [leftMargin, setLeftMargin] = useState<number>(140);
   const [rightMargin, setRightMargin] = useState<number>(450);
 
-  // Debug state
-  const [piecesForDebug, setPieces] = useState<PieceDebug[]>([]);
-
   /**
    * Initialize canvas context and editor
    * Also sets up debug information update interval
@@ -43,12 +40,6 @@ const Canvas = () => {
       if (editor) editor.dispose();
     };
   }, []);
-
-  useEffect(() => {
-    if (editor) {
-      editor.startDebugUpdates(setPieces);
-    }
-  }, [editor]);
 
   /**
    * Handles keyboard input for text editing and cursor movement
@@ -102,15 +93,7 @@ const Canvas = () => {
       </div>
 
       {/* Debug panel positioned at bottom right */}
-      {editor && (
-        <DebugPanel
-          cursorPosition={editor.getCursorPosition()}
-          pieceTable={editor.getPieceTable()}
-          textRenderer={editor.getTextRenderer()}
-          textParser={editor.getTextParser()}
-          piecesForDebug={piecesForDebug}
-        />
-      )}
+      {editor && <DebugPanelNew editor={editor} />}
     </>
   );
 };

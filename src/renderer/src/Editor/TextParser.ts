@@ -5,16 +5,27 @@ import { Paragraph } from './Paragraph';
 /**
  * Represents a line of text with associated metadata.
  *
- * @property text - The content of the line.
+ * @property te    lines.push({
+      text: currentLine || '',
+      offset: offsetInParagraph,
+      length: currentLine.length,
+      pixelLength: this._ctx.measureText(currentLine).width,
+      wordpixelOffsets: [...wordpixelOffsets],
+      wordCharOffsets: [...wordCharOffsets],
+    });e content of the line.
  * @property offset - The starting character offset of the line relative to the paragraph.
  * @property length - The number of characters in the line.
  * @property pixelLength - The rendered pixel width of the line.
+ * @property wordpixelOffsets - An array of pixel offsets for each word in the line.
+ * @property wordCharOffsets - An array of character offsets for each word in the line.
  */
 export type Line = {
   text: string;
   offset: number;
   length: number;
   pixelLength: number;
+  wordpixelOffsets: number[];
+  wordCharOffsets: number[];
 };
 
 export class TextParser {
@@ -107,6 +118,7 @@ export class TextParser {
     }
   }
 
+  //TODO: rewrite this
   // Split a paragraph into lines based on the canvas width
   public splitParagraphIntoLines(paragraph: Paragraph): void {
     const maxWidth = this._editor.wrappingWidth;
@@ -116,52 +128,111 @@ export class TextParser {
 
     let offsetInParagraph = 0;
     let currentLine = '';
+    let wordpixelOffsets: number[] = [];
+    let wordCharOffsets: number[] = [];
 
     tokens.forEach((token) => {
-      const testLine = currentLine + token;
-      const metrics = this._ctx.measureText(testLine);
-
-      //If the token is spaces only, test those spaces one by one
+      //If the token is spaces only
       if (token.trim() === '') {
-        for (const char of token) {
-          const testChar = currentLine + char;
+        // If this is the start of a new line (empty currentLine), add initial 0 offset
+        if (currentLine === '') {
+          wordpixelOffsets.push(0);
+          wordCharOffsets.push(0);
+        }
+
+        let currentSpaceWidth = 0;
+        const spaceWidth = this._ctx.measureText(' ').width;
+        let spaceIndex = 0;
+
+        // Process spaces one by one to allow breaking within space sequences
+        while (spaceIndex < token.length) {
+          const testChar = currentLine + token[spaceIndex];
           const charMetrics = this._ctx.measureText(testChar);
-          if (charMetrics.width > maxWidth && currentLine.trim()) {
-            lines.push({
-              text: currentLine,
-              offset: offsetInParagraph,
-              length: currentLine.length,
-              pixelLength: this._ctx.measureText(currentLine).width,
-            });
-            offsetInParagraph += currentLine.length;
-            currentLine = char; // Start new line with the space character
+
+          // If adding this space exceeds the max width, we need to handle line breaking
+          if (charMetrics.width > maxWidth) {
+            // If current line has content, push it and start new line
+            if (currentLine.length > 0) {
+              lines.push({
+                text: currentLine,
+                offset: offsetInParagraph,
+                length: currentLine.length,
+                pixelLength: this._ctx.measureText(currentLine).width,
+                wordpixelOffsets: [...wordpixelOffsets],
+                wordCharOffsets: [...wordCharOffsets],
+              });
+              offsetInParagraph += currentLine.length;
+
+              // Start a new line and continue processing remaining spaces
+              wordpixelOffsets = [0]; // Always start with 0 for new lines
+              wordCharOffsets = [0]; // Always start with 0 for new lines
+              currentLine = '';
+              currentSpaceWidth = 0;
+              // Continue with the same space in the next iteration
+            } else {
+              // Current line is empty, force add at least one space
+              currentLine = testChar;
+              currentSpaceWidth += spaceWidth;
+              spaceIndex++;
+            }
           } else {
-            currentLine = testChar; // Add the space to the current line
+            // Space fits on current line, add it
+            currentLine = testChar;
+            currentSpaceWidth += spaceWidth;
+            spaceIndex++;
           }
         }
-        return; // Skip further processing for spaces
+
+        // Only add to wordpixelOffsets if there are multiple spaces in the token
+        if (token.length > 1) {
+          wordpixelOffsets.push(this._ctx.measureText(currentLine).width - currentSpaceWidth);
+          wordCharOffsets.push(currentLine.length - token.length);
+        }
+
+        // Continue to next token
+        return;
       }
 
-      if (metrics.width > maxWidth && currentLine.trim()) {
-        lines.push({
-          text: currentLine,
-          offset: offsetInParagraph,
-          length: currentLine.length,
-          pixelLength: this._ctx.measureText(currentLine).width,
-        });
-        offsetInParagraph += currentLine.length;
-        currentLine = token;
-      } else {
-        currentLine = testLine;
+      if (token.trim()) {
+        // Handle regular words/tokens
+        // Recalculate testLine and metrics after spaces have been processed
+        const testLine = currentLine + token;
+        const metrics = this._ctx.measureText(testLine);
+
+        if (metrics.width > maxWidth && currentLine.length > 0) {
+          // Line is too long, push the current line...
+          lines.push({
+            text: currentLine,
+            offset: offsetInParagraph,
+            length: currentLine.length,
+            pixelLength: this._ctx.measureText(currentLine).width,
+            wordpixelOffsets: [...wordpixelOffsets],
+            wordCharOffsets: [...wordCharOffsets],
+          });
+          offsetInParagraph += currentLine.length;
+
+          // ...and start a new line with the current token
+          wordpixelOffsets = [0];
+          wordCharOffsets = [0];
+          currentLine = token;
+        } else {
+          wordpixelOffsets.push(this._ctx.measureText(currentLine).width);
+          wordCharOffsets.push(currentLine.length);
+          currentLine = testLine;
+        }
       }
     });
 
+    // Push any remaining text as the last line
     lines.push({
       text: currentLine || '',
       offset: offsetInParagraph,
       length: currentLine.length,
       pixelLength: this._ctx.measureText(currentLine).width,
+      wordpixelOffsets: wordpixelOffsets,
+      wordCharOffsets: wordCharOffsets,
     });
+    console.log('Paragraph lines:', lines);
 
     paragraph.setLines(lines); // Use the new setLines method which also marks as clean
   }
@@ -275,7 +346,8 @@ export class TextParser {
   public mapCursorPositionToStructure(cursorPosition: number): void {
     let renderedCursorPosition: [number, number, number, number] = [-1, -1, -1, -1]; // Reset cursor position
 
-    // IF the cursor position is equal to the end of the document, we need to handle it specially
+    //THIS DOESN'T SEEM TO BE NEEDED ANYMORE
+    /*     // IF the cursor position is equal to the end of the document, we need to handle it specially
     if (cursorPosition === this._pieceTable.length) {
       // Set cursor at the end of the last paragraph
       const lastParagraph = this._paragraphs[this._paragraphs.length - 1];
@@ -290,7 +362,7 @@ export class TextParser {
       }
       this.cursorPositionInStructure = renderedCursorPosition;
       return;
-    }
+    } */
 
     // 1. Within which paragraph is the cursor position?
     let paragraphIndex = -1;
@@ -304,7 +376,7 @@ export class TextParser {
       // If the cursor is in the paragraph, set the index of the paragraph and break the loop
       if (isCursorInParagraph) {
         paragraphIndex = i;
-        console.log(paragraph);
+
         break;
       }
     }
@@ -328,7 +400,7 @@ export class TextParser {
 
       const cursorOffsetInParagraph = cursorPosition - paragraph.offset;
 
-      const isOnlyLine = paragraph.lines.length === 1;
+      const isOnlyLine = paragraph.lines.length === 1; //XXX: look into this logic
       const isLastLine = j === paragraph.lines.length - 1;
 
       const isLastLineButNotOnlyLine = isLastLine && !isOnlyLine;
@@ -371,66 +443,51 @@ export class TextParser {
     const [paragraphIndex, lineIndex, _characterOffset, pixelOffset] =
       this.cursorPositionInStructure;
 
-    if (paragraphIndex === -1 || lineIndex === -1) {
-      return cursorPosition; // Invalid position, return original
+    if (paragraphIndex === -1 || lineIndex === -1 || pixelOffset === -1) {
+      console.log(
+        'getLineAdjacentCursorPosition - Invalid cursor position structure:',
+        this.cursorPositionInStructure,
+      );
+      return cursorPosition;
     }
 
-    const currentParagraph = this._paragraphs[paragraphIndex];
+    const initialParagraph = this._paragraphs[paragraphIndex];
     let targetParagraphIndex = paragraphIndex;
-    let targetLineIndex = lineIndex;
+    let targetLine = -1;
 
-    // Calculate target line index based on direction
-    if (direction === 'above') {
-      targetLineIndex = lineIndex - 1;
-
-      // If we're at the first line of a paragraph, move to the last line of the previous paragraph
-      if (targetLineIndex < 0 && paragraphIndex > 0) {
-        targetParagraphIndex = paragraphIndex - 1;
-        const prevParagraph = this._paragraphs[targetParagraphIndex];
-        targetLineIndex = prevParagraph.lines.length - 1;
-      }
-    } else {
-      // 'under'
-      targetLineIndex = lineIndex + 1;
-
-      // If we're at the last line of a paragraph, move to the first line of the next paragraph
-      if (
-        targetLineIndex >= currentParagraph.lines.length &&
-        paragraphIndex < this._paragraphs.length - 1
-      ) {
-        targetParagraphIndex = paragraphIndex + 1;
-        targetLineIndex = 0;
-      }
+    // 1 - Easy case we're not at first or last line
+    if (direction === 'above' && lineIndex > 0) {
+      targetLine = lineIndex - 1;
+    } else if (direction === 'below' && lineIndex < initialParagraph.lines.length - 1) {
+      targetLine = lineIndex + 1;
     }
 
-    // Check if target position is valid
-    if (targetParagraphIndex < 0 || targetParagraphIndex >= this._paragraphs.length) {
-      return cursorPosition; // Out of bounds, return original position
+    // 2 - We're at the first line and want to go up, or at the last line and want to go down
+    if (targetLine === -1) {
+      if (direction === 'above') {
+        // Move to the end of the previous paragraph if it exists
+        if (paragraphIndex > 0) {
+          targetParagraphIndex -= 1;
+          const previousParagraph = this._paragraphs[targetParagraphIndex];
+          targetLine = previousParagraph.lines.length - 1;
+        } else {
+          return cursorPosition; // Already at the top of the document
+        }
+      } else if (direction === 'below') {
+        // Move to the start of the next paragraph if it exists
+        if (paragraphIndex < this._paragraphs.length - 1) {
+          targetLine = 0;
+          targetParagraphIndex += 1;
+        } else {
+          return cursorPosition; // Already at the bottom of the document
+        }
+      }
     }
-
     const targetParagraph = this._paragraphs[targetParagraphIndex];
-    if (targetLineIndex < 0 || targetLineIndex >= targetParagraph.lines.length) {
-      return cursorPosition; // Out of bounds, return original position
-    }
 
-    const targetLine = targetParagraph.lines[targetLineIndex];
+    // Now find the character index in the target line based on pixelOffset
+    const line = targetParagraph.lines[targetLine];
 
-    // Find the closest character position in the target line based on pixel offset
-    let closestPosition = targetLine.offset;
-    let minDistance = Math.abs(pixelOffset);
-
-    // Check each character position in the target line
-    for (let i = 0; i <= targetLine.length; i++) {
-      const textUpToPosition = targetLine.text.substring(0, i);
-      const currentPixelOffset = this._ctx.measureText(textUpToPosition).width;
-      const distance = Math.abs(currentPixelOffset - pixelOffset);
-
-      if (distance < minDistance) {
-        minDistance = distance;
-        closestPosition = targetLine.offset + i;
-      }
-    }
-
-    return closestPosition;
+    return targetParagraph.offset + targetParagraph.lines[targetLine].offset;
   }
 }

@@ -11,6 +11,21 @@ export class TextRenderer {
 
   private justifyText: boolean = false;
 
+  private _hoveredParagraphIndex: number | null = null;
+  private _hoveredLine: { p: number; l: number } | null = null;
+
+  public setHoveredParagraph(index: number | null): void {
+    this._hoveredParagraphIndex = index;
+  }
+
+  public setHoveredLine(pindex: number | null, lindex?: number | null): void {
+    if (pindex === null || lindex === null || lindex === undefined) {
+      this._hoveredLine = null;
+      return;
+    }
+    this._hoveredLine = { p: pindex, l: lindex };
+  }
+
   // Getter and setter for debug info
   public get showDebugInfo(): boolean {
     return this._showDebugInfo;
@@ -41,8 +56,6 @@ export class TextRenderer {
 
   // Render debug information for paragraphs, lines, and cursor position
   private renderDebugInfo(lineHeight: number): void {
-    if (!this._showDebugInfo) return;
-
     // Save the current context state to avoid interference with main text rendering
     this.ctx.save();
 
@@ -58,42 +71,101 @@ export class TextRenderer {
 
     this.ctx.translate(0, lineHeight);
     paragraphs.forEach((paragraph, pindex) => {
+      // Highlight hovered paragraph area (always, regardless of debug text toggle)
+      if (this._hoveredParagraphIndex === pindex) {
+        const left = this._editor.margins.left - 2;
+        const width = this._editor.wrappingWidth + 4;
+        const height = paragraph.lines.length * lineHeight;
+        const top = -lineHeight;
+        this.ctx.save();
+        this.ctx.strokeStyle = 'rgba(56, 189, 248, 0.9)';
+        this.ctx.lineWidth = 2;
+        this.ctx.strokeRect(left, top, width, height);
+        this.ctx.restore();
+      }
       // Render paragraph debug info
+      if (this._showDebugInfo && this._editor.debugConfig.showParagraphBounds) {
+        const padding = 5;
 
-      const padding = 5;
+        const paragraphHeight = paragraph.lines.length * lineHeight;
+        const paragraphHeightWithoutPadding = paragraphHeight - padding * 2;
 
-      const paragraphHeight = paragraph.lines.length * lineHeight;
-      const paragraphHeightWithoutPadding = paragraphHeight - padding * 2;
+        const paragraphMidHeight = paragraphHeightWithoutPadding / 2;
 
-      const paragraphMidHeight = paragraphHeightWithoutPadding / 2;
+        const paragraphTop = -lineHeight;
 
-      const paragraphTop = -lineHeight;
+        this.ctx.fillStyle = 'blue';
+        this.ctx.fillText(
+          `P${pindex} - l ${paragraph.length}`,
+          position + 10,
+          paragraphMidHeight - lineHeight / 2 + padding,
+        );
+        this.ctx.fillText(
+          ` o ${paragraph.offset}`,
+          position + 80,
+          paragraphMidHeight - lineHeight / 2 + padding,
+        );
+        this.ctx.fillText(
+          ` e ${paragraph.offset + paragraph.length}`,
+          position + 170,
+          paragraphMidHeight - lineHeight / 2 + padding,
+        );
 
-      this.ctx.fillStyle = 'blue';
-      this.ctx.fillText(
-        `P${pindex} - l ${paragraph.length}`,
-        position + 10,
-        paragraphMidHeight - lineHeight / 2 + padding,
-      );
-      this.ctx.fillText(
-        ` o ${paragraph.offset}`,
-        position + 80,
-        paragraphMidHeight - lineHeight / 2 + padding,
-      );
-      this.ctx.fillText(
-        ` e ${paragraph.offset + paragraph.length}`,
-        position + 170,
-        paragraphMidHeight - lineHeight / 2 + padding,
-      );
+        this.ctx.fillStyle = 'green';
+        this.ctx.fillRect(position, paragraphTop + padding * 2, 4, paragraphHeightWithoutPadding); // Underline for paragraph info
+      }
 
-      this.ctx.fillStyle = 'green';
-      this.ctx.fillRect(position, paragraphTop + padding * 2, 4, paragraphHeightWithoutPadding); // Underline for paragraph info
-
-      paragraph.lines.forEach((line) => {
+      paragraph.lines.forEach((line, lindex) => {
+        // Highlight hovered line (always)
+        if (this._hoveredLine && this._hoveredLine.p === pindex && this._hoveredLine.l === lindex) {
+          const left = this._editor.margins.left - 2;
+          const width = Math.max(0, Math.min(this._editor.wrappingWidth, line.pixelLength + 4));
+          const top = -lineHeight + 1;
+          const height = lineHeight - 2;
+          this.ctx.save();
+          this.ctx.strokeStyle = 'rgba(16, 185, 129, 0.95)';
+          this.ctx.lineWidth = 2;
+          this.ctx.strokeRect(left, top, width, height);
+          this.ctx.restore();
+        }
         // Render line debug info
-        this.ctx.fillText(`offset ${line.offset}`, 10, 0);
-        this.ctx.fillText(`length ${line.length}`, 80, 0);
+        if (this._showDebugInfo && this._editor.debugConfig.showLineInfo) {
+          this.ctx.fillStyle = 'blue';
+          this.ctx.fillText(`offset ${line.offset}`, 10, 0);
+          this.ctx.fillText(`length ${line.length}`, 80, 0);
+        }
 
+        if (this._showDebugInfo && this._editor.debugConfig.showWordOffsets) {
+          line.wordpixelOffsets.forEach((wordOffset, windex) => {
+            // Render word pixel offsets as small vertical lines
+            this.ctx.fillStyle = 'red';
+            this.ctx.fillRect(
+              wordOffset + this._editor.margins.left - 1,
+              -lineHeight,
+              2,
+              lineHeight,
+            );
+            this.ctx.fillStyle = 'green';
+            const topOrBottom =
+              windex % 2 === 0 ? lineHeight - lineHeight / 2 + 7 : lineHeight - lineHeight / 2;
+
+            // Display different info based on mode
+            let displayText = '';
+            switch (this._editor.debugConfig.wordDisplayMode) {
+              case 'index':
+                displayText = `${windex}`;
+                break;
+              case 'charOffset':
+                displayText = `${line.wordCharOffsets[windex] || 0}`;
+                break;
+              case 'pixelOffset':
+                displayText = `${wordOffset}px`;
+                break;
+            }
+
+            this.ctx.fillText(displayText, wordOffset + this._editor.margins.left - 2, topOrBottom);
+          });
+        }
         this.ctx.translate(0, lineHeight);
       });
     });
@@ -121,12 +193,14 @@ export class TextRenderer {
           this._textParser.cursorPositionInStructure[0] === pindex &&
           this._textParser.cursorPositionInStructure[1] === lindex
         ) {
-          this.ctx.fillRect(
-            this._textParser.cursorPositionInStructure[3] + leftMargin,
-            0,
-            2, // Cursor width
-            lineHeight,
-          );
+          if (this._editor.debugConfig.showCursor) {
+            this.ctx.fillRect(
+              this._textParser.cursorPositionInStructure[3] + leftMargin,
+              0,
+              2,
+              lineHeight,
+            );
+          }
         }
 
         if (this.justifyText) {
@@ -146,7 +220,7 @@ export class TextRenderer {
 
     this.ctx.restore();
 
-    // Render debug information if enabled
+    // Always render debug overlay pass (will only show text if enabled)
     this.renderDebugInfo(lineHeight);
   }
 }

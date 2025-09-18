@@ -4,4 +4,4 @@ This is a sample text for the editor. \n You can edit this text. Lorem ipsum dol
 a facilisis enim sapien nec quam. Vestibulum ante ipsum primis in faucibus orci luctus et ultrices posuere cubilia curae;
 Donec vel sapien nec erat sagittis scelerisque. Suspendisse potenti. 
 
-Try editing this text to see how the editor works!`;
+Try editing this text         to see how the editor works!`;
