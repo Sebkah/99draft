@@ -2,6 +2,7 @@ import { PieceTable } from './PieceTable/PieceTable';
 import { TextRenderer } from './TextRenderer';
 import { InputManager } from './Input/InputManager';
 import { TextParser } from './TextParser';
+import { CursorManager, StructurePosition } from './CursorManager';
 
 /**
  * Type definition for debugging piece table structure
@@ -33,7 +34,12 @@ export class Editor {
   private textRenderer: TextRenderer;
   private textParser: TextParser;
   private inputManager: InputManager;
-  public cursorPosition: number;
+
+  public cursorManager: CursorManager;
+
+  public get cursorPosition(): number {
+    return this.cursorManager.getPosition();
+  }
 
   public margins: { left: number; right: number };
   public debugConfig: DebugConfig;
@@ -47,6 +53,10 @@ export class Editor {
     return this.canvas.width - this.margins.left - this.margins.right;
   }
 
+  public getStructurePosition(): StructurePosition {
+    return this.cursorManager.structurePosition;
+  }
+
   constructor(
     initialText: string,
     ctx: CanvasRenderingContext2D,
@@ -55,16 +65,13 @@ export class Editor {
     // Initialize piece table with provided text
     this.pieceTable = new PieceTable(initialText);
 
-    // Initialize cursor position at end of text
-    this.cursorPosition = Math.floor(this.pieceTable.length / 2);
-
     // Store canvas reference
     this.canvas = ctx.canvas;
     this.margins = margins;
 
     // Initialize debug configuration with default values
     this.debugConfig = {
-      showWordOffsets: true,
+      showWordOffsets: false,
       showLineInfo: true,
       showParagraphBounds: true,
       showCursor: true,
@@ -74,8 +81,19 @@ export class Editor {
     // Initialize text renderer and input manager
     this.textParser = new TextParser(this.pieceTable, ctx, this);
     this.textRenderer = new TextRenderer(ctx, this.textParser, this);
-    this.textParser.mapCursorPositionToStructure(this.cursorPosition);
-    this.inputManager = new InputManager(this.pieceTable, this.textRenderer, this.textParser, this);
+    this.cursorManager = new CursorManager(
+      Math.floor(this.pieceTable.length / 2),
+      this.textParser,
+      ctx,
+      this,
+    );
+    this.inputManager = new InputManager(
+      this.pieceTable,
+      this.textRenderer,
+      this.textParser,
+      this.cursorManager,
+      this,
+    );
 
     this.textRenderer.render();
 
@@ -91,6 +109,13 @@ export class Editor {
   handleKeyDown(event: KeyboardEvent): boolean {
     if (!this.inputManager) return false;
     return this.inputManager.handleKeyDown(event);
+  }
+
+  handleClick(x: number, y: number): void {
+    this.cursorManager.mapPixelCoordinateToStructure(x, y, true);
+
+    this.emitDebugUpdate();
+    this.textRenderer.render();
   }
 
   /**
@@ -115,7 +140,7 @@ export class Editor {
     if (rightMargin !== undefined) this.margins.right = rightMargin;
 
     this.textParser.splitAllParagraphsIntoLines();
-    this.textParser.mapCursorPositionToStructure(this.cursorPosition);
+    this.cursorManager.mapCursorPositionToStructure();
     this.textRenderer.render();
   }
 
@@ -123,7 +148,7 @@ export class Editor {
    * Get the current cursor position
    */
   getCursorPosition(): number {
-    return this.cursorPosition;
+    return this.cursorManager.getPosition();
   }
 
   /**
@@ -156,25 +181,28 @@ export class Editor {
 
     this.textParser.reparseParagraph(this.cursorPosition, text.length);
 
-    this.cursorPosition = Math.min(this.pieceTable.length, this.cursorPosition + text.length);
+    /*  this.cursorPosition = Math.min(this.pieceTable.length, this.cursorPosition + text.length); */
+    this.cursorManager.setCursorPosition(
+      Math.min(this.pieceTable.length, this.cursorPosition + text.length),
+    );
 
-    this.textParser.mapCursorPositionToStructure(this.cursorPosition);
     this.textRenderer.render();
-    this.triggerDebugUpdate();
+    this.emitDebugUpdate();
   }
 
   //TODO: this should also do partial reparsing, but we need to be carefull if we delete newlines
   deleteText(length: number): void {
     if (this.cursorPosition > 0) {
       this.pieceTable.delete(this.cursorPosition - 1, length);
-      this.cursorPosition = Math.max(0, this.cursorPosition - length);
+
+      this.cursorManager.setCursorPosition(Math.max(0, this.cursorPosition - length));
 
       this.textParser.splitIntoParagraphs();
       this.textParser.splitAllParagraphsIntoLines();
 
-      this.textParser.mapCursorPositionToStructure(this.cursorPosition);
+      this.cursorManager.mapCursorPositionToStructure();
       this.textRenderer.render();
-      this.triggerDebugUpdate();
+      this.emitDebugUpdate();
     }
   }
 
@@ -182,11 +210,10 @@ export class Editor {
     this.pieceTable.insert('\n', this.cursorPosition);
     this.textParser.splitParagraph(this.cursorPosition);
 
-    this.cursorPosition = Math.min(this.pieceTable.length, this.cursorPosition + 1);
+    this.cursorManager.setCursorPosition(Math.min(this.pieceTable.length, this.cursorPosition + 1));
 
-    this.textParser.mapCursorPositionToStructure(this.cursorPosition);
     this.textRenderer.render();
-    this.triggerDebugUpdate();
+    this.emitDebugUpdate();
   }
 
   /**
@@ -196,13 +223,13 @@ export class Editor {
   startDebugUpdates(callback: (pieces: PieceDebug[]) => void): void {
     this.debugUpdateCallback = callback;
     // Trigger initial update
-    this.triggerDebugUpdate();
+    this.emitDebugUpdate();
   }
 
   /**
    * Trigger debug information update immediately
    */
-  public triggerDebugUpdate(): void {
+  public emitDebugUpdate(): void {
     if (this.debugUpdateCallback) {
       /*  console.log('Triggering debug update'); */
       const pieces = this.pieceTable.getPieces().map((piece) => {

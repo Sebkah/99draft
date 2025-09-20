@@ -176,6 +176,7 @@ export class TextRenderer {
 
   public render(): void {
     const leftMargin = this._editor.margins.left; // Left margin for the text
+    const structurePosition = this._editor.getStructurePosition();
     const lineHeight = 20; // Height of each line
     this.ctx.clearRect(0, 0, this.ctx.canvas.width, this.ctx.canvas.height);
 
@@ -189,17 +190,9 @@ export class TextRenderer {
     paragraphs.forEach((paragraph, pindex) => {
       paragraph.lines.forEach((line, lindex) => {
         // Render cursor if it's in the current line
-        if (
-          this._textParser.cursorPositionInStructure[0] === pindex &&
-          this._textParser.cursorPositionInStructure[1] === lindex
-        ) {
+        if (structurePosition.paragraphIndex === pindex && structurePosition.lineIndex === lindex) {
           if (this._editor.debugConfig.showCursor) {
-            this.ctx.fillRect(
-              this._textParser.cursorPositionInStructure[3] + leftMargin,
-              0,
-              2,
-              lineHeight,
-            );
+            this.ctx.fillRect(structurePosition.pixelOffsetInLine + leftMargin, 0, 2, lineHeight);
           }
         }
 

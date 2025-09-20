@@ -34,7 +34,7 @@ export class TextParser {
   private _ctx: CanvasRenderingContext2D;
   private _editor: Editor;
 
-  public cursorPositionInStructure: [number, number, number, number] = [-1, -1, -1, -1]; // [paragraphIndex, lineIndex, characterIndex, offsetInLineInPixels]
+ 
 
   constructor(pieceTable: PieceTable, ctx: CanvasRenderingContext2D, editor: Editor) {
     this._pieceTable = pieceTable;
@@ -52,7 +52,6 @@ export class TextParser {
 
   public splitAllParagraphsIntoLines(): void {
     this._paragraphs.forEach((paragraph, i) => {
-      console.log('Parsing paragraph:', i);
       this.splitParagraphIntoLines(paragraph);
     });
   }
@@ -63,8 +62,6 @@ export class TextParser {
 */
   public reparseParagraph(position: number, editLength: number): void {
     const paragraphIndex = this.findParagraphIndexAtOffset(position);
-    console.log('Parsing single paragraph:', paragraphIndex, 'edit length:', editLength);
-
     const paragraph = this._paragraphs[paragraphIndex];
     if (!paragraph) return;
 
@@ -232,7 +229,6 @@ export class TextParser {
       wordpixelOffsets: wordpixelOffsets,
       wordCharOffsets: wordCharOffsets,
     });
-    console.log('Paragraph lines:', lines);
 
     paragraph.setLines(lines); // Use the new setLines method which also marks as clean
   }
@@ -343,151 +339,5 @@ export class TextParser {
   }
 
   // Map cursor position to paragraph, line, and pixel offset
-  public mapCursorPositionToStructure(cursorPosition: number): void {
-    let renderedCursorPosition: [number, number, number, number] = [-1, -1, -1, -1]; // Reset cursor position
-
-    //THIS DOESN'T SEEM TO BE NEEDED ANYMORE
-    /*     // IF the cursor position is equal to the end of the document, we need to handle it specially
-    if (cursorPosition === this._pieceTable.length) {
-      // Set cursor at the end of the last paragraph
-      const lastParagraph = this._paragraphs[this._paragraphs.length - 1];
-      if (lastParagraph) {
-        const lastLine = lastParagraph.lines[lastParagraph.lines.length - 1];
-        renderedCursorPosition = [
-          this._paragraphs.length - 1,
-          lastParagraph.lines.length - 1,
-          lastLine.length,
-          this._ctx.measureText(lastLine.text).width,
-        ];
-      }
-      this.cursorPositionInStructure = renderedCursorPosition;
-      return;
-    } */
-
-    // 1. Within which paragraph is the cursor position?
-    let paragraphIndex = -1;
-    for (let i = 0; i < this._paragraphs.length; i++) {
-      const paragraph = this._paragraphs[i];
-
-      const isCursorInParagraph =
-        cursorPosition >= paragraph.offset &&
-        cursorPosition < paragraph.offset + paragraph.length + 1;
-
-      // If the cursor is in the paragraph, set the index of the paragraph and break the loop
-      if (isCursorInParagraph) {
-        paragraphIndex = i;
-
-        break;
-      }
-    }
-
-    // Set the paragraph index in the rendered cursor position
-    renderedCursorPosition[0] = paragraphIndex;
-
-    // 2. Within which line of the paragraph is the cursor position?
-    const paragraph = this._paragraphs[paragraphIndex];
-    if (!paragraph) {
-      // Cursor position is out of bounds in the paragraphs
-      renderedCursorPosition[1] = -1;
-      this.cursorPositionInStructure = renderedCursorPosition;
-    }
-
-    // Search the cursor position in the lines of the paragraphs
-    let lineIndex = -1;
-
-    for (let j = 0; j < paragraph.lines.length; j++) {
-      const line = paragraph.lines[j];
-
-      const cursorOffsetInParagraph = cursorPosition - paragraph.offset;
-
-      const isOnlyLine = paragraph.lines.length === 1; //XXX: look into this logic
-      const isLastLine = j === paragraph.lines.length - 1;
-
-      const isLastLineButNotOnlyLine = isLastLine && !isOnlyLine;
-
-      let endOffsetDelta = isOnlyLine ? 1 : isLastLineButNotOnlyLine ? 1 : 0;
-
-      if (
-        cursorOffsetInParagraph >= line.offset &&
-        cursorOffsetInParagraph < line.offset + line.length + endOffsetDelta
-      ) {
-        lineIndex = j;
-        break;
-      }
-    }
-    renderedCursorPosition[1] = lineIndex;
-
-    // 3. Calculate the offset within the line in pixels
-    if (lineIndex !== -1) {
-      const cursorOffsetInParagraph = cursorPosition - paragraph.offset;
-      const line = paragraph.lines[lineIndex];
-      const positionInLine = cursorOffsetInParagraph - line.offset;
-      const textBeforeCursor = line.text.substring(0, positionInLine);
-      const metrics = this._ctx.measureText(textBeforeCursor);
-      renderedCursorPosition[2] = positionInLine; // Character index within the line
-      renderedCursorPosition[3] = metrics.width; // Offset in pixels within the line
-    } else {
-      renderedCursorPosition[2] = -1; // Cursor is not in any line
-      renderedCursorPosition[3] = -1;
-    }
-
-    this.cursorPositionInStructure = renderedCursorPosition;
-  }
-
-  public getLineAdjacentCursorPosition(
-    cursorPosition: number,
-    direction: 'above' | 'below',
-  ): number {
-    // Get current cursor position mapping
-    this.mapCursorPositionToStructure(cursorPosition);
-    const [paragraphIndex, lineIndex, _characterOffset, pixelOffset] =
-      this.cursorPositionInStructure;
-
-    if (paragraphIndex === -1 || lineIndex === -1 || pixelOffset === -1) {
-      console.log(
-        'getLineAdjacentCursorPosition - Invalid cursor position structure:',
-        this.cursorPositionInStructure,
-      );
-      return cursorPosition;
-    }
-
-    const initialParagraph = this._paragraphs[paragraphIndex];
-    let targetParagraphIndex = paragraphIndex;
-    let targetLine = -1;
-
-    // 1 - Easy case we're not at first or last line
-    if (direction === 'above' && lineIndex > 0) {
-      targetLine = lineIndex - 1;
-    } else if (direction === 'below' && lineIndex < initialParagraph.lines.length - 1) {
-      targetLine = lineIndex + 1;
-    }
-
-    // 2 - We're at the first line and want to go up, or at the last line and want to go down
-    if (targetLine === -1) {
-      if (direction === 'above') {
-        // Move to the end of the previous paragraph if it exists
-        if (paragraphIndex > 0) {
-          targetParagraphIndex -= 1;
-          const previousParagraph = this._paragraphs[targetParagraphIndex];
-          targetLine = previousParagraph.lines.length - 1;
-        } else {
-          return cursorPosition; // Already at the top of the document
-        }
-      } else if (direction === 'below') {
-        // Move to the start of the next paragraph if it exists
-        if (paragraphIndex < this._paragraphs.length - 1) {
-          targetLine = 0;
-          targetParagraphIndex += 1;
-        } else {
-          return cursorPosition; // Already at the bottom of the document
-        }
-      }
-    }
-    const targetParagraph = this._paragraphs[targetParagraphIndex];
-
-    // Now find the character index in the target line based on pixelOffset
-    const line = targetParagraph.lines[targetLine];
-
-    return targetParagraph.offset + targetParagraph.lines[targetLine].offset;
-  }
+  
 }

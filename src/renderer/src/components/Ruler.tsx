@@ -77,7 +77,15 @@ const Ruler: React.FC<RulerProps> = ({
         onRightMarginChange(newRight);
       }
     },
-    [dragging, getPositionFromEvent, onLeftMarginChange, onRightMarginChange, leftMargin, rightMargin, width],
+    [
+      dragging,
+      getPositionFromEvent,
+      onLeftMarginChange,
+      onRightMarginChange,
+      leftMargin,
+      rightMargin,
+      width,
+    ],
   );
 
   /**
@@ -144,7 +152,7 @@ const Ruler: React.FC<RulerProps> = ({
   return (
     <div
       ref={rulerRef}
-      className="relative bg-gray-100 border-b border-gray-300 select-none"
+      className="relative bg-white border-b border-gray-300 select-none"
       style={{ width: `${width}px`, height: '20px' }} // Reduced height
     >
       {/* Ruler background and ticks */}

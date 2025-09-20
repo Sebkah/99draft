@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { motion } from 'motion/react';
 import { Editor, PieceDebug, DebugConfig } from '@renderer/Editor/Editor';
+import { StructurePosition } from '@renderer/Editor/CursorManager';
 
 type Props = {
   editor: Editor;
@@ -10,16 +11,17 @@ const DebugPanelNew: React.FC<Props> = ({ editor }) => {
   const [pieces, setPieces] = useState<PieceDebug[]>([]);
   const [cursor, setCursor] = useState<{
     pos: number;
-    structure: [number, number, number, number] | null;
+    structure: StructurePosition | null;
   }>({
     pos: editor.getCursorPosition(),
-    structure: editor.getTextParser()?.cursorPositionInStructure ?? null,
+    structure: editor.getStructurePosition() ?? null,
   });
 
   const renderer = useMemo(() => editor.getTextRenderer(), [editor]);
   const pieceTable = useMemo(() => editor.getPieceTable(), [editor]);
 
   const [showDebugInfo, setShowDebugInfo] = useState<boolean>(renderer?.showDebugInfo ?? true);
+  const [collapsed, setCollapsed] = useState<boolean>(false);
   const [debugConfig, setDebugConfig] = useState<DebugConfig>({ ...editor.debugConfig });
 
   useEffect(() => {
@@ -27,7 +29,7 @@ const DebugPanelNew: React.FC<Props> = ({ editor }) => {
       setPieces(newPieces);
       setCursor({
         pos: editor.getCursorPosition(),
-        structure: editor.getTextParser()?.cursorPositionInStructure ?? null,
+        structure: editor.getStructurePosition() ?? null,
       });
     });
     return () => {
@@ -77,18 +79,36 @@ const DebugPanelNew: React.FC<Props> = ({ editor }) => {
   const structuresRef = useRef<HTMLDivElement | null>(null);
 
   return (
-    <div className="fixed right-4 bottom-4 w-[520px] max-h-[70vh] text-xs text-white/95 backdrop-blur-md border border-white/20 rounded-xl shadow-2xl overflow-hidden z-20 bg-gradient-to-br from-slate-900/70 to-slate-800/60 flex flex-col">
-      <div className="flex items-center justify-between gap-2 px-3 py-2 border-b border-white/10">
+    <div
+      className={`fixed right-4 bottom-4 w-[520px] ${collapsed ? '' : 'max-h-[70vh]'} text-xs text-white/95 backdrop-blur-md border border-white/20 rounded-xl shadow-2xl overflow-hidden z-20 bg-gradient-to-br from-slate-900/70 to-slate-800/60 flex flex-col`}
+    >
+      <div className="flex items-center justify-between gap-2 px-3 py-2 border-b border-white/10 select-none">
         <div className="flex items-center gap-2">
           <strong className="text-sm">Debug Panel</strong>
         </div>
         <div className="flex items-center gap-2 text-xs opacity-90">
-          <span>Overlay</span>
+          <span className="hidden sm:inline">Overlay</span>
           <Switch checked={showDebugInfo} onChange={toggleShowDebugInfo} accent="sky" />
+          <button
+            type="button"
+            onClick={() => setCollapsed((v) => !v)}
+            className="ml-1 inline-flex items-center gap-1 px-2 py-1 rounded-md bg-white/5 hover:bg-white/10 border border-white/15 text-white/90"
+            title={collapsed ? 'Expand panel' : 'Collapse panel'}
+            aria-label={collapsed ? 'Expand panel' : 'Collapse panel'}
+          >
+            <svg
+              className={`size-4 transition-transform ${collapsed ? '' : 'rotate-180'}`}
+              viewBox="0 0 20 20"
+              fill="currentColor"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path d="M5 8l5 6 5-6H5z" />
+            </svg>
+          </button>
         </div>
       </div>
 
-      <div className="min-h-0 overflow-auto">
+      <div className={`${collapsed ? 'hidden' : 'min-h-0 overflow-auto'}`}>
         <Section title="Cursor" accent="sky" defaultOpen>
           <div className="space-y-2">
             <div className="flex items-center justify-between text-xs">
@@ -105,16 +125,16 @@ const DebugPanelNew: React.FC<Props> = ({ editor }) => {
               {cursor.structure ? (
                 <>
                   <div className="px-2 py-0.5 rounded bg-white/10 border border-white/15 text-center">
-                    {cursor.structure[0]}
+                    {cursor.structure.paragraphIndex}
                   </div>
                   <div className="px-2 py-0.5 rounded bg-white/10 border border-white/15 text-center">
-                    {cursor.structure[1]}
+                    {cursor.structure.lineIndex}
                   </div>
                   <div className="px-2 py-0.5 rounded bg-white/10 border border-white/15 text-center">
-                    {cursor.structure[2]}
+                    {cursor.structure.characterIndex}
                   </div>
                   <div className="px-2 py-0.5 rounded bg-white/10 border border-white/15 text-center">
-                    {Math.round((cursor.structure[3] ?? 0) as number)}px
+                    {Math.round((cursor.structure.pixelOffsetInLine ?? 0) as number)}px
                   </div>
                 </>
               ) : (

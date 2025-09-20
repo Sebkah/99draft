@@ -71,10 +71,15 @@ const Canvas = () => {
     editor.setMargins(leftMargin, newRightMargin);
   };
 
+  const handleClick = (event: React.MouseEvent<HTMLCanvasElement, MouseEvent>) => {
+    if (!editor) return;
+    editor.handleClick(event.nativeEvent.offsetX, event.nativeEvent.offsetY);
+  };
+
   return (
     <>
       {/* Main text editor canvas */}
-      <div className=" h-full">
+      <div className=" h-full grid grid-rows-auto  gap-2 content-start ">
         <Ruler
           width={editorWidth}
           leftMargin={leftMargin}
@@ -88,6 +93,7 @@ const Canvas = () => {
           width={editorWidth}
           height={400}
           onKeyDown={handleKeyDown}
+          onClick={handleClick}
           className="bg-white pointer-events-auto shadow-lg focus:outline-none "
         />
       </div>

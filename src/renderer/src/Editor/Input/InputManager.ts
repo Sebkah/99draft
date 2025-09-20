@@ -1,3 +1,4 @@
+import { CursorManager } from '../CursorManager';
 import { Editor } from '../Editor';
 import { PieceTable } from '../PieceTable/PieceTable';
 import { TextParser } from '../TextParser';
@@ -16,16 +17,19 @@ export class InputManager {
   private textParser: TextParser;
 
   private editor: Editor;
+  private cursorManager: CursorManager;
 
   constructor(
     pieceTable: PieceTable,
     textRenderer: TextRenderer,
     textParser: TextParser,
+    cursorManager: CursorManager,
     editor: Editor,
   ) {
     this.pieceTable = pieceTable;
 
     this.textRenderer = textRenderer;
+    this.cursorManager = cursorManager;
     this.textParser = textParser;
     this.editor = editor;
   }
@@ -85,7 +89,7 @@ export class InputManager {
    */
   handleKeyDown(event: KeyboardEvent): boolean {
     // Handle Enter key - insert newline at cursor position
-    this.editor.triggerDebugUpdate();
+    this.editor.emitDebugUpdate();
     if (event.key === 'Enter') {
       this.editor.insertLineBreak();
       return true;
@@ -100,8 +104,10 @@ export class InputManager {
     // Handle cursor movement - Left arrow
     if (event.key === 'ArrowLeft') {
       const mul = this.computeArrowMultiplier(false);
-      this.editor.cursorPosition = Math.max(0, Math.floor(this.editor.cursorPosition - 1 * mul));
-      this.textParser.mapCursorPositionToStructure(this.editor.cursorPosition);
+
+      // Current position
+      const currentPos = this.cursorManager.getPosition();
+      this.cursorManager.setCursorPosition(Math.max(0, Math.floor(currentPos - 1 * mul)));
 
       this.textRenderer.render();
       return true;
@@ -110,33 +116,22 @@ export class InputManager {
     // Handle cursor movement - Right arrow
     if (event.key === 'ArrowRight') {
       const mul = this.computeArrowMultiplier(true);
-      this.editor.cursorPosition = Math.min(
-        this.pieceTable.length,
-        this.editor.cursorPosition + Math.floor(1 * mul),
-      );
-      this.textParser.mapCursorPositionToStructure(this.editor.cursorPosition);
 
+      // Current position
+      const currentPos = this.cursorManager.getPosition();
+      this.cursorManager.setCursorPosition(
+        Math.min(this.pieceTable.length, Math.floor(currentPos + 1 * mul)),
+      );
       this.textRenderer.render();
       return true;
     }
 
     if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
-      let newCursorPosition: number;
       if (event.key === 'ArrowUp') {
-        newCursorPosition = this.textParser.getLineAdjacentCursorPosition(
-          this.editor.cursorPosition,
-          'above',
-        );
+        this.cursorManager.moveUp();
       } else {
-        newCursorPosition = this.textParser.getLineAdjacentCursorPosition(
-          this.editor.cursorPosition,
-          'below',
-        );
+        this.cursorManager.moveDown();
       }
-      this.editor.cursorPosition = newCursorPosition;
-
-      this.textParser.mapCursorPositionToStructure(this.editor.cursorPosition);
-
       this.textRenderer.render();
     }
     // Handle printable character input
@@ -148,22 +143,5 @@ export class InputManager {
 
     // Event not handled
     return false;
-  }
-
-  /**
-   * Moves cursor to specified position, ensuring it stays within valid bounds
-   * @param position - Target cursor position
-   */
-  setCursorPosition(position: number): void {
-    this.editor.cursorPosition = Math.max(0, Math.min(this.pieceTable.length, position));
-    this.textParser.mapCursorPositionToStructure(this.editor.cursorPosition);
-  }
-
-  /**
-   * Gets the current cursor position
-   * @returns Current cursor position
-   */
-  getCursorPosition(): number {
-    return this.editor.cursorPosition;
   }
 }
