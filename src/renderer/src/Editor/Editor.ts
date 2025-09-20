@@ -26,6 +26,13 @@ export interface DebugConfig {
   wordDisplayMode: 'index' | 'charOffset' | 'pixelOffset';
 }
 
+type Margins = {
+  left?: number;
+  right?: number;
+  top?: number;
+  bottom?: number;
+};
+
 /**
  * Editor class that manages all text editing functionality
  * Coordinates between PieceTable, TextRenderer, and InputManager
@@ -42,7 +49,12 @@ export class Editor {
     return this.cursorManager.getPosition();
   }
 
-  public margins: { left: number; right: number };
+  public margins: { left: number; right: number; top: number; bottom: number } = {
+    left: 50,
+    right: 50,
+    top: 50,
+    bottom: 50,
+  };
   public debugConfig: DebugConfig;
 
   private canvas: HTMLCanvasElement | null = null;
@@ -58,24 +70,25 @@ export class Editor {
     return this.cursorManager.structurePosition;
   }
 
-  constructor(
-    initialText: string,
-    ctx: CanvasRenderingContext2D,
-    margins = { left: 50, right: 50 },
-  ) {
+  constructor(initialText: string, ctx: CanvasRenderingContext2D, margins: Margins) {
     // Initialize piece table with provided text
     this.pieceTable = new PieceTable(initialText);
 
     // Store canvas reference
     this.canvas = ctx.canvas;
-    this.margins = margins;
+
+    // Set initial margins if provided
+    if (margins.left !== undefined) this.margins.left = margins.left;
+    if (margins.right !== undefined) this.margins.right = margins.right;
+    if (margins.top !== undefined) this.margins.top = margins.top;
+    if (margins.bottom !== undefined) this.margins.bottom = margins.bottom;
 
     // Initialize debug configuration with default values
     this.debugConfig = {
       showWordOffsets: false,
       showLineInfo: false,
       showParagraphBounds: false,
-      showCursor: false,
+      showCursor: true,
       wordDisplayMode: 'charOffset',
     };
 

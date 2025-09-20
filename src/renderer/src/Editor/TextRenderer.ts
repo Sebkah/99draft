@@ -182,6 +182,8 @@ export class TextRenderer {
 
     this.ctx.save();
 
+    this.ctx.translate(0, this._editor.margins.top); // Top margin
+
     // Set base text style for all text rendering
     this.setBaseTextStyle();
 

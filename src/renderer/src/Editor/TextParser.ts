@@ -28,13 +28,17 @@ export type Line = {
   wordCharOffsets: number[];
 };
 
+type Pages = {
+
+};
+
 export class TextParser {
   private _pieceTable: PieceTable;
   private _paragraphs: Paragraph[] = [];
   private _ctx: CanvasRenderingContext2D;
   private _editor: Editor;
 
- 
+  private _pages: Pages[] = [];
 
   constructor(pieceTable: PieceTable, ctx: CanvasRenderingContext2D, editor: Editor) {
     this._pieceTable = pieceTable;
@@ -339,5 +343,4 @@ export class TextParser {
   }
 
   // Map cursor position to paragraph, line, and pixel offset
-  
 }

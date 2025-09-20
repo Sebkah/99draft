@@ -352,7 +352,7 @@ export class CursorManager {
     const lineHeight = 20; // Height of each line
     const leftMargin = this._editor.margins.left; // Left margin for the text
     const adjustedX = x - leftMargin; // Adjust x for left margin
-    const lineIndex = Math.floor(y / lineHeight);
+    const lineIndex = Math.floor((y - this._editor.margins.top) / lineHeight);
 
     const paragraphs = this._textParser.getParagraphs();
 

@@ -5,7 +5,8 @@ import Ruler from './Ruler';
 import React, { useEffect, useRef, useState } from 'react';
 import { baseText } from '@renderer/assets/baseText';
 
-const editorWidth = 1000;
+const editorWidth = 800;
+const editorHeight = (editorWidth / 21) * 29.7; // A4 aspect ratio
 
 /**
  * Canvas component that implements a text editor using piece table data structure
@@ -18,8 +19,8 @@ const Canvas = () => {
   const [editor, setEditor] = useState<Editor | null>(null);
 
   // Layout/rendering state
-  const [leftMargin, setLeftMargin] = useState<number>(140);
-  const [rightMargin, setRightMargin] = useState<number>(450);
+  const [leftMargin, setLeftMargin] = useState<number>(50);
+  const [rightMargin, setRightMargin] = useState<number>(50);
 
   /**
    * Initialize canvas context and editor
@@ -32,7 +33,7 @@ const Canvas = () => {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    setEditor(new Editor(baseText, ctx, { left: leftMargin, right: rightMargin }));
+    setEditor(new Editor(baseText, ctx, { left: leftMargin, right: rightMargin, top: 50 }));
     // Focus the canvas for keyboard input
     canvas.focus();
     // Cleanup on unmount
@@ -86,7 +87,7 @@ const Canvas = () => {
           ref={canvasRef}
           tabIndex={0} // Make canvas focusable for keyboard input
           width={editorWidth}
-          height={1000}
+          height={editorHeight}
           onKeyDown={handleKeyDown}
           onPointerMove={(e) => {
             if (!editor || !e.buttons) return;
