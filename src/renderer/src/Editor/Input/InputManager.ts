@@ -85,7 +85,7 @@ export class InputManager {
    */
   handleKeyDown(event: KeyboardEvent): boolean {
     // Handle Enter key - insert newline at cursor position
-    this.editor.triggerDebugUpdate();
+
     if (event.key === 'Enter') {
       this.editor.insertLineBreak();
       return true;
@@ -138,6 +138,7 @@ export class InputManager {
       this.textParser.mapCursorPositionToStructure(this.editor.cursorPosition);
 
       this.textRenderer.render();
+      return true;
     }
     // Handle printable character input
     if (event.key.length === 1 && !event.ctrlKey && !event.metaKey) {

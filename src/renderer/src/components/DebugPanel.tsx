@@ -108,7 +108,7 @@ const DebugPanel: React.FC<DebugPanelProps> = ({ editor }) => {
   // Initialize debug updates
   useEffect(() => {
     if (editor) {
-      editor.startDebugUpdates((pieces: PieceDebug[]) => {
+      editor.subscribeToDebugUpdates((pieces: PieceDebug[]) => {
         setPiecesForDebug(pieces);
       });
       setDebugConfig(editor.debugConfig);

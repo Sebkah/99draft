@@ -20,6 +20,7 @@ const Canvas = () => {
   // Layout/rendering state
   const [leftMargin, setLeftMargin] = useState<number>(140);
   const [rightMargin, setRightMargin] = useState<number>(450);
+  const [currentParagraphIndex, setCurrentParagraphIndex] = useState<number>(0);
 
   /**
    * Initialize canvas context and editor
@@ -32,7 +33,20 @@ const Canvas = () => {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    setEditor(new Editor(baseText, ctx, { left: leftMargin, right: rightMargin }));
+    const ed = new Editor(baseText, ctx, { left: leftMargin, right: rightMargin });
+    setEditor(ed);
+    // initialize ruler with paragraph at current cursor
+    const tp = ed.getTextParser();
+    if (tp) {
+      const [p] = tp.cursorPositionInStructure;
+      const idx = p !== -1 ? p : 0;
+      setCurrentParagraphIndex(idx);
+      const style = ed.getParagraphStyle(idx);
+      if (style) {
+        setLeftMargin(style.left);
+        setRightMargin(style.right);
+      }
+    }
     // Focus the canvas for keyboard input
     canvas.focus();
     // Cleanup on unmount
@@ -50,6 +64,19 @@ const Canvas = () => {
     const handled = editor.handleKeyDown(event.nativeEvent);
     if (handled) {
       event.preventDefault();
+      // After movement/edits, sync ruler to current paragraph
+      const tp = editor.getTextParser();
+      if (tp) {
+        const [p] = tp.cursorPositionInStructure;
+        if (p !== -1) {
+          setCurrentParagraphIndex(p);
+          const style = editor.getParagraphStyle(p);
+          if (style) {
+            setLeftMargin(style.left);
+            setRightMargin(style.right);
+          }
+        }
+      }
     }
   };
 
@@ -59,7 +86,8 @@ const Canvas = () => {
   const handleLeftMarginChange = (newLeftMargin: number) => {
     setLeftMargin(newLeftMargin);
     if (!editor) return;
-    editor.setMargins(newLeftMargin, rightMargin);
+    const index = currentParagraphIndex;
+    if (index >= 0) editor.setParagraphMargins(index, newLeftMargin, rightMargin);
   };
 
   /**
@@ -68,13 +96,15 @@ const Canvas = () => {
   const handleRightMarginChange = (newRightMargin: number) => {
     setRightMargin(newRightMargin);
     if (!editor) return;
-    editor.setMargins(leftMargin, newRightMargin);
+    const index = currentParagraphIndex;
+    if (index >= 0) editor.setParagraphMargins(index, leftMargin, newRightMargin);
   };
 
   return (
     <>
       {/* Main text editor canvas */}
       <div className=" h-full">
+        {/* TODO: some functionnality of ruler should not be in the react component but in the library */}
         <Ruler
           width={editorWidth}
           leftMargin={leftMargin}

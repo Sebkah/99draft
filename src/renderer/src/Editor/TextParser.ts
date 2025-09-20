@@ -28,9 +28,15 @@ export type Line = {
   wordCharOffsets: number[];
 };
 
+export type ParagraphStyle = {
+  left: number;
+  right: number;
+};
+
 export class TextParser {
   private _pieceTable: PieceTable;
   private _paragraphs: Paragraph[] = [];
+  private _paragraphStyles: ParagraphStyle[] = [];
   private _ctx: CanvasRenderingContext2D;
   private _editor: Editor;
 
@@ -48,6 +54,19 @@ export class TextParser {
 
   public getParagraphs(): Paragraph[] {
     return this._paragraphs;
+  }
+
+  public getParagraphStyles(): ParagraphStyle[] {
+    return this._paragraphStyles;
+  }
+
+  public getParagraphStyle(index: number): ParagraphStyle | undefined {
+    return this._paragraphStyles[index];
+  }
+
+  public setParagraphMargins(index: number, left: number, right: number): void {
+    if (!this._paragraphStyles[index]) return;
+    this._paragraphStyles[index] = { left, right };
   }
 
   public splitAllParagraphsIntoLines(): void {
@@ -84,7 +103,11 @@ export class TextParser {
   public splitIntoParagraphs(): void {
     const pieces = this._pieceTable.getPieces();
 
+    const oldParagraphs = this._paragraphs;
+    const oldStyles = this._paragraphStyles;
+
     this._paragraphs = []; // Reset paragraphs for each parse
+    this._paragraphStyles = []; // Reset styles; will remap below
     let currentOffset = 0;
 
     // Iterate over the pieces
@@ -102,11 +125,19 @@ export class TextParser {
           currentOffset += 1; // Account for newline
           // Start a new empty paragraph
           this._paragraphs.push(new Paragraph('', currentOffset));
+          this._paragraphStyles.push({
+            left: this._editor.defaultMargins.left,
+            right: this._editor.defaultMargins.right,
+          });
         } else if (token.length > 0) {
           // Text content
           if (this._paragraphs.length === 0) {
             // Start new paragraph
             this._paragraphs.push(new Paragraph(token, currentOffset));
+            this._paragraphStyles.push({
+              left: this._editor.defaultMargins.left,
+              right: this._editor.defaultMargins.right,
+            });
           } else {
             // Append to existing paragraph
             const lastParagraph = this._paragraphs[this._paragraphs.length - 1];
@@ -116,12 +147,28 @@ export class TextParser {
         }
       });
     }
+
+    // Attempt to remap old styles to new paragraphs based on offsets
+    if (oldParagraphs && oldParagraphs.length > 0 && oldStyles && oldStyles.length > 0) {
+      this._paragraphs.forEach((p, idx) => {
+        // Find old paragraph that contained this start offset
+        const oldIdx = oldParagraphs.findIndex((op) => op.containsPosition(p.offset));
+        if (oldIdx !== -1 && oldStyles[oldIdx]) {
+          this._paragraphStyles[idx] = { ...oldStyles[oldIdx] };
+        }
+      });
+    }
   }
 
   //TODO: rewrite this
   // Split a paragraph into lines based on the canvas width
   public splitParagraphIntoLines(paragraph: Paragraph): void {
-    const maxWidth = this._editor.wrappingWidth;
+    const pindex = this._paragraphs.indexOf(paragraph);
+    const style = this._paragraphStyles[pindex] || {
+      left: this._editor.defaultMargins.left,
+      right: this._editor.defaultMargins.right,
+    };
+    const maxWidth = this._ctx.canvas.width - style.left - style.right;
     // Split while preserving spaces
     const tokens = paragraph.text.split(/(\s+)/);
     const lines: Line[] = [];
@@ -266,6 +313,12 @@ export class TextParser {
 
     // Insert the new paragraph after the current one
     this._paragraphs.splice(paragraphIndex + 1, 0, newParagraph);
+    // Duplicate current paragraph style to new paragraph
+    const inheritedStyle = this._paragraphStyles[paragraphIndex] || {
+      left: this._editor.defaultMargins.left,
+      right: this._editor.defaultMargins.right,
+    };
+    this._paragraphStyles.splice(paragraphIndex + 1, 0, { ...inheritedStyle });
 
     // Shift offsets for all subsequent paragraphs (starting from the one after the new paragraph)
     for (let i = paragraphIndex + 2; i < this._paragraphs.length; i++) {
@@ -313,17 +366,20 @@ export class TextParser {
 
   public mapPixelCoordinateToStructure(x: number, y: number): [number, number, number] {
     const lineHeight = 20; // Height of each line
-    const leftMargin = this._editor.margins.left; // Left margin for the text
-    const adjustedX = x - leftMargin; // Adjust x for left margin
     const lineIndex = Math.floor(y / lineHeight);
 
     let accumulatedLines = 0;
     for (let pIndex = 0; pIndex < this._paragraphs.length; pIndex++) {
       const paragraph = this._paragraphs[pIndex];
+      const style = this._paragraphStyles[pIndex] || {
+        left: this._editor.defaultMargins.left,
+        right: this._editor.defaultMargins.right,
+      };
       if (lineIndex < accumulatedLines + paragraph.lines.length) {
         const lineInParagraph = lineIndex - accumulatedLines;
         const line = paragraph.lines[lineInParagraph];
         // Now find the character index in the line based on adjustedX
+        const adjustedX = x - style.left; // Adjust x for this paragraph's left margin
         let charIndex = 0;
         let currentWidth = 0;
         for (let i = 0; i < line.text.length; i++) {
@@ -486,8 +542,6 @@ export class TextParser {
     const targetParagraph = this._paragraphs[targetParagraphIndex];
 
     // Now find the character index in the target line based on pixelOffset
-    const line = targetParagraph.lines[targetLine];
-
     return targetParagraph.offset + targetParagraph.lines[targetLine].offset;
   }
 }

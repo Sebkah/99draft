@@ -23,7 +23,7 @@ const DebugPanelNew: React.FC<Props> = ({ editor }) => {
   const [debugConfig, setDebugConfig] = useState<DebugConfig>({ ...editor.debugConfig });
 
   useEffect(() => {
-    editor.startDebugUpdates((newPieces) => {
+    editor.subscribeToDebugUpdates((newPieces) => {
       setPieces(newPieces);
       setCursor({
         pos: editor.getCursorPosition(),
@@ -32,7 +32,7 @@ const DebugPanelNew: React.FC<Props> = ({ editor }) => {
     });
     return () => {
       // Clear the subscription with a noop to avoid stale callbacks
-      editor.startDebugUpdates(() => {});
+      editor.subscribeToDebugUpdates(() => {});
     };
   }, [editor]);
 
@@ -172,11 +172,11 @@ const DebugPanelNew: React.FC<Props> = ({ editor }) => {
           <div className="grid grid-cols-2 gap-2 text-sm">
             <div className="text-xs opacity-80">Left margin</div>
             <div className="px-2 py-0.5 rounded bg-white/10 border border-white/15 text-center">
-              {editor.margins.left}px
+              {editor.defaultMargins.left}px
             </div>
             <div className="text-xs opacity-80">Right margin</div>
             <div className="px-2 py-0.5 rounded bg-white/10 border border-white/15 text-center">
-              {editor.margins.right}px
+              {editor.defaultMargins.right}px
             </div>
             <div className="text-xs opacity-80">Wrap width</div>
             <div className="px-2 py-0.5 rounded bg-white/10 border border-white/15 text-center">

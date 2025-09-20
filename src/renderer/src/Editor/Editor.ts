@@ -35,7 +35,7 @@ export class Editor {
   private inputManager: InputManager;
   public cursorPosition: number;
 
-  public margins: { left: number; right: number };
+  public defaultMargins: { left: number; right: number };
   public debugConfig: DebugConfig;
 
   private canvas: HTMLCanvasElement | null = null;
@@ -44,7 +44,22 @@ export class Editor {
   // Getter for wrapping width
   public get wrappingWidth(): number {
     if (!this.canvas) return 700; // Default width if canvas not set
-    return this.canvas.width - this.margins.left - this.margins.right;
+    return this.canvas.width - this.defaultMargins.left - this.defaultMargins.right;
+  }
+
+  public getParagraphStyles() {
+    return this.textParser.getParagraphStyles();
+  }
+
+  public getParagraphStyle(index: number) {
+    return this.textParser.getParagraphStyle(index);
+  }
+
+  public setParagraphMargins(index: number, left: number, right: number) {
+    this.textParser.setParagraphMargins(index, left, right);
+    this.textParser.splitParagraphIntoLines(this.textParser.getParagraphs()[index]);
+    this.textParser.mapCursorPositionToStructure(this.cursorPosition);
+    this.textRenderer.render();
   }
 
   constructor(
@@ -60,11 +75,11 @@ export class Editor {
 
     // Store canvas reference
     this.canvas = ctx.canvas;
-    this.margins = margins;
+    this.defaultMargins = margins;
 
     // Initialize debug configuration with default values
     this.debugConfig = {
-      showWordOffsets: true,
+      showWordOffsets: false,
       showLineInfo: true,
       showParagraphBounds: true,
       showCursor: true,
@@ -99,8 +114,8 @@ export class Editor {
    * @param rightMargin - Right margin in pixels
    */
   setMargins(leftMargin: number, rightMargin: number): void {
-    this.margins.left = leftMargin;
-    this.margins.right = rightMargin;
+    this.defaultMargins.left = leftMargin;
+    this.defaultMargins.right = rightMargin;
     this.updateMargins();
   }
 
@@ -111,8 +126,8 @@ export class Editor {
    * @param canvasWidth - Optional canvas width override
    */
   updateMargins(leftMargin?: number, rightMargin?: number): void {
-    if (leftMargin !== undefined) this.margins.left = leftMargin;
-    if (rightMargin !== undefined) this.margins.right = rightMargin;
+    if (leftMargin !== undefined) this.defaultMargins.left = leftMargin;
+    if (rightMargin !== undefined) this.defaultMargins.right = rightMargin;
 
     this.textParser.splitAllParagraphsIntoLines();
     this.textParser.mapCursorPositionToStructure(this.cursorPosition);
@@ -193,7 +208,7 @@ export class Editor {
    * Start debug information updates (triggered on input changes)
    * @param callback - Function to call with updated debug information
    */
-  startDebugUpdates(callback: (pieces: PieceDebug[]) => void): void {
+  subscribeToDebugUpdates(callback: (pieces: PieceDebug[]) => void): void {
     this.debugUpdateCallback = callback;
     // Trigger initial update
     this.triggerDebugUpdate();
@@ -202,7 +217,7 @@ export class Editor {
   /**
    * Trigger debug information update immediately
    */
-  public triggerDebugUpdate(): void {
+  private triggerDebugUpdate(): void {
     if (this.debugUpdateCallback) {
       /*  console.log('Triggering debug update'); */
       const pieces = this.pieceTable.getPieces().map((piece) => {
