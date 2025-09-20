@@ -2,8 +2,8 @@ import { PieceTable } from './PieceTable/PieceTable';
 import { TextRenderer } from './TextRenderer';
 import { InputManager } from './Input/InputManager';
 import { TextParser } from './TextParser';
-import { CursorManager, MousePosition, StructurePosition } from './CursorManager';
-import { m } from 'motion/dist/react';
+import { CursorManager, MousePosition } from './CursorManager';
+import { SelectionManager } from './SelectionManager';
 
 /**
  * Type definition for debugging piece table structure
@@ -35,7 +35,17 @@ type Margins = {
 
 /**
  * Editor class that manages all text editing functionality
- * Coordinates between PieceTable, TextRenderer, and InputManager
+ * Coordinates between PieceTable, TextRenderer, and other subsystems
+ *
+ * Public API:
+ * - cursorManager: Direct access to cursor operations
+ * - selectionManager: Direct access to selection operations
+ * - insertText(), deleteText(), insertLineBreak(): High-level editing operations
+ * - handleKeyDown(): Input event handling
+ * - setMargins(), updateMargins(): Layout configuration
+ *
+ * Internal subsystems are kept private to maintain consistency and proper coordination.
+ * Use the public managers for direct access to cursor/selection functionality.
  */
 export class Editor {
   private pieceTable: PieceTable;
@@ -44,10 +54,7 @@ export class Editor {
   private inputManager: InputManager;
 
   public cursorManager: CursorManager;
-
-  public get cursorPosition(): number {
-    return this.cursorManager.getPosition();
-  }
+  public selectionManager: SelectionManager;
 
   public margins: { left: number; right: number; top: number; bottom: number } = {
     left: 50,
@@ -64,10 +71,6 @@ export class Editor {
   public get wrappingWidth(): number {
     if (!this.canvas) return 700; // Default width if canvas not set
     return this.canvas.width - this.margins.left - this.margins.right;
-  }
-
-  public getStructurePosition(): StructurePosition {
-    return this.cursorManager.structurePosition;
   }
 
   constructor(initialText: string, ctx: CanvasRenderingContext2D, margins: Margins) {
@@ -101,13 +104,9 @@ export class Editor {
       ctx,
       this,
     );
-    this.inputManager = new InputManager(
-      this.pieceTable,
-      this.textRenderer,
-      this.textParser,
-      this.cursorManager,
-      this,
-    );
+    this.selectionManager = new SelectionManager(this, this.cursorManager);
+    this.cursorManager.setSelectionManager(this.selectionManager);
+    this.inputManager = new InputManager(this.textRenderer, this.cursorManager, this);
 
     this.textRenderer.render();
 
@@ -126,15 +125,15 @@ export class Editor {
   }
 
   startSelection(mousePosition: MousePosition): void {
-    this.cursorManager.startSelection(mousePosition);
+    this.selectionManager.startSelection(mousePosition);
     this.textRenderer.render();
   }
   updateSelection(mousePosition: MousePosition): void {
-    this.cursorManager.updateSelection(mousePosition);
+    this.selectionManager.updateSelection(mousePosition);
     this.textRenderer.render();
   }
   endSelection(mousePosition: MousePosition): void {
-    this.cursorManager.endSelection(mousePosition);
+    this.selectionManager.endSelection(mousePosition);
     this.textRenderer.render();
   }
 
@@ -160,15 +159,8 @@ export class Editor {
     if (rightMargin !== undefined) this.margins.right = rightMargin;
 
     this.textParser.splitAllParagraphsIntoLines();
-    this.cursorManager.mapCursorPositionToStructure();
+    this.cursorManager.mapLinearToStructure();
     this.textRenderer.render();
-  }
-
-  /**
-   * Get the current cursor position
-   */
-  getCursorPosition(): number {
-    return this.cursorManager.getPosition();
   }
 
   /**
@@ -179,12 +171,17 @@ export class Editor {
   }
 
   /**
-   * Get the text renderer for debugging purposes
+   * Get the text renderer for debugging/inspection purposes
+   * @deprecated Use editor.textRenderer directly for debugging
    */
   getTextRenderer(): TextRenderer | null {
     return this.textRenderer;
   }
 
+  /**
+   * Get the text parser for debugging/inspection purposes
+   * @deprecated Use editor.textParser directly for debugging
+   */
   getTextParser(): TextParser | null {
     return this.textParser;
   }
@@ -195,12 +192,12 @@ export class Editor {
     // If it's not just one letter
     const parts = text.split('\n');
 
-    if (this.cursorManager.selection) {
-      const start = this.cursorManager.selection.start;
-      const end = this.cursorManager.selection.end;
-      this.pieceTable.delete(start, end - start);
-      this.cursorManager.setCursorPosition(start);
-      this.cursorManager.selection = null;
+    // Handle selection deletion if there's a selection
+    const deletedRange = this.selectionManager.deleteSelection();
+    if (deletedRange) {
+      this.textParser.splitIntoParagraphs();
+      this.textParser.splitAllParagraphsIntoLines();
+      this.cursorManager.mapLinearToStructure();
     }
 
     if (parts.length > 1) {
@@ -217,13 +214,13 @@ export class Editor {
       return;
     }
 
-    this.pieceTable.insert(text, this.cursorPosition);
+    this.pieceTable.insert(text, this.cursorManager.getPosition());
 
-    this.textParser.reparseParagraph(this.cursorPosition, text.length);
+    this.textParser.reparseParagraph(this.cursorManager.getPosition(), text.length);
 
     /*  this.cursorPosition = Math.min(this.pieceTable.length, this.cursorPosition + text.length); */
     this.cursorManager.setCursorPosition(
-      Math.min(this.pieceTable.length, this.cursorPosition + text.length),
+      Math.min(this.pieceTable.length, this.cursorManager.getPosition() + text.length),
     );
 
     this.textRenderer.render();
@@ -232,39 +229,38 @@ export class Editor {
 
   //TODO: this should also do partial reparsing, but we need to be carefull if we delete newlines
   deleteText(length: number): void {
-    if (this.cursorManager.selection) {
-      const start = this.cursorManager.selection.start;
-      const end = this.cursorManager.selection.end;
-      this.pieceTable.delete(start, end - start);
-      this.cursorManager.setCursorPosition(start);
-      this.cursorManager.selection = null;
+    // Handle selection deletion if there's a selection
+    const deletedRange = this.selectionManager.deleteSelection();
+    if (deletedRange) {
       this.textParser.splitIntoParagraphs();
       this.textParser.splitAllParagraphsIntoLines();
-      this.cursorManager.mapCursorPositionToStructure();
+      this.cursorManager.mapLinearToStructure();
       this.textRenderer.render();
       this.emitDebugUpdate();
       return;
     }
 
-    if (this.cursorPosition > 0) {
-      this.pieceTable.delete(this.cursorPosition - 1, length);
+    if (this.cursorManager.getPosition() > 0) {
+      this.pieceTable.delete(this.cursorManager.getPosition() - 1, length);
 
-      this.cursorManager.setCursorPosition(Math.max(0, this.cursorPosition - length));
+      this.cursorManager.setCursorPosition(Math.max(0, this.cursorManager.getPosition() - length));
 
       this.textParser.splitIntoParagraphs();
       this.textParser.splitAllParagraphsIntoLines();
 
-      this.cursorManager.mapCursorPositionToStructure();
+      this.cursorManager.mapLinearToStructure();
       this.textRenderer.render();
       this.emitDebugUpdate();
     }
   }
 
   insertLineBreak(): void {
-    this.pieceTable.insert('\n', this.cursorPosition);
-    this.textParser.splitParagraph(this.cursorPosition);
+    this.pieceTable.insert('\n', this.cursorManager.getPosition());
+    this.textParser.splitParagraph(this.cursorManager.getPosition());
 
-    this.cursorManager.setCursorPosition(Math.min(this.pieceTable.length, this.cursorPosition + 1));
+    this.cursorManager.setCursorPosition(
+      Math.min(this.pieceTable.length, this.cursorManager.getPosition() + 1),
+    );
 
     this.textRenderer.render();
     this.emitDebugUpdate();

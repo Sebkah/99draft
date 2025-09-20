@@ -69,7 +69,7 @@ export class TextRenderer {
     const paragraphs = this._textParser.getParagraphs();
     const position = this.ctx.canvas.width - this._editor.margins.right;
 
-    this.ctx.translate(0, lineHeight);
+    this.ctx.translate(0, lineHeight + this._editor.margins.top); // Start below top margin
     paragraphs.forEach((paragraph, pindex) => {
       // Highlight hovered paragraph area (always, regardless of debug text toggle)
       if (this._hoveredParagraphIndex === pindex) {
@@ -176,7 +176,7 @@ export class TextRenderer {
 
   public render(): void {
     const leftMargin = this._editor.margins.left; // Left margin for the text
-    const structurePosition = this._editor.getStructurePosition();
+    const structurePosition = this._editor.cursorManager.structurePosition;
     const lineHeight = 20; // Height of each line
     this.ctx.clearRect(0, 0, this.ctx.canvas.width, this.ctx.canvas.height);
 
@@ -190,8 +190,8 @@ export class TextRenderer {
     const paragraphs = this._textParser.getParagraphs();
 
     // Draw selection highlight if present
-    if (this._editor.cursorManager.selection) {
-      const sel = this._editor.cursorManager.selection;
+    if (this._editor.selectionManager.hasSelection()) {
+      const sel = this._editor.selectionManager.getSelection()!;
       const start = sel.start;
       const end = sel.end;
       this.ctx.save();
@@ -231,7 +231,7 @@ export class TextRenderer {
         if (
           structurePosition.paragraphIndex === pindex &&
           structurePosition.lineIndex === lindex &&
-          !this._editor.cursorManager.selection
+          !this._editor.selectionManager.hasSelection()
         ) {
           if (this._editor.debugConfig.showCursor) {
             this.ctx.fillRect(structurePosition.pixelOffsetInLine + leftMargin, 0, 2, lineHeight);

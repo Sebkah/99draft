@@ -13,8 +13,8 @@ const DebugPanelNew: React.FC<Props> = ({ editor }) => {
     pos: number;
     structure: StructurePosition | null;
   }>({
-    pos: editor.getCursorPosition(),
-    structure: editor.getStructurePosition() ?? null,
+    pos: editor.cursorManager.getPosition(),
+    structure: editor.cursorManager.structurePosition ?? null,
   });
 
   const renderer = useMemo(() => editor.getTextRenderer(), [editor]);
@@ -28,8 +28,8 @@ const DebugPanelNew: React.FC<Props> = ({ editor }) => {
     editor.startDebugUpdates((newPieces) => {
       setPieces(newPieces);
       setCursor({
-        pos: editor.getCursorPosition(),
-        structure: editor.getStructurePosition() ?? null,
+        pos: editor.cursorManager.getPosition(),
+        structure: editor.cursorManager.structurePosition ?? null,
       });
     });
     return () => {

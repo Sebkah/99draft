@@ -1,7 +1,5 @@
 import { CursorManager } from '../CursorManager';
 import { Editor } from '../Editor';
-import { PieceTable } from '../PieceTable/PieceTable';
-import { TextParser } from '../TextParser';
 
 import { TextRenderer } from '../TextRenderer';
 
@@ -10,27 +8,19 @@ import { TextRenderer } from '../TextRenderer';
  * Separates input logic from UI rendering concerns
  */
 export class InputManager {
-  private pieceTable: PieceTable;
-
   private textRenderer: TextRenderer;
-
-  private textParser: TextParser;
-
   private editor: Editor;
   private cursorManager: CursorManager;
 
   constructor(
-    pieceTable: PieceTable,
     textRenderer: TextRenderer,
-    textParser: TextParser,
+
     cursorManager: CursorManager,
     editor: Editor,
   ) {
-    this.pieceTable = pieceTable;
-
     this.textRenderer = textRenderer;
     this.cursorManager = cursorManager;
-    this.textParser = textParser;
+
     this.editor = editor;
   }
 
@@ -87,15 +77,11 @@ export class InputManager {
    * Copies the selected text to clipboard if there's a selection
    */
   private async handleCopy(): Promise<void> {
-    const selection = this.cursorManager.selection;
-    if (!selection) {
+    if (!this.editor.selectionManager.hasSelection()) {
       return; // Nothing to copy if no selection
     }
 
-    const selectedText = this.pieceTable.getRangeText(
-      selection.start,
-      selection.end - selection.start,
-    );
+    const selectedText = this.editor.selectionManager.getSelectedText();
 
     try {
       await navigator.clipboard.writeText(selectedText);

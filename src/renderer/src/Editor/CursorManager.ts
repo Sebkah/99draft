@@ -1,6 +1,9 @@
 import { Editor } from './Editor';
 import { TextParser } from './TextParser';
 
+// Forward declaration to avoid circular dependency
+class SelectionManager {}
+
 export type StructurePosition = {
   paragraphIndex: number;
   lineIndex: number;
@@ -24,59 +27,9 @@ export class CursorManager {
     pixelOffsetInLine: -1,
   };
   private _editor: Editor;
-
-  public selection: { start: number; end: number } | null = null;
+  private _selectionManager?: SelectionManager;
 
   private measureText: (text: string) => TextMetrics;
-
-  /**
-   * Current cursor position represented in terms of paragraph, line, character index, and pixel offset within the line
-   * The TextRenderer uses this to draw the cursor at the correct position
-   */
-
-  startSelection(mousePosition: MousePosition): void {
-    this.selection = null;
-
-    this.mapPixelCoordinateToStructure(mousePosition.x, mousePosition.y, true);
-  }
-
-  updateSelection(mousePosition: MousePosition): void {
-    const endPointInStructure = this.mapPixelCoordinateToStructure(
-      mousePosition.x,
-      mousePosition.y,
-      false,
-    );
-    if (endPointInStructure === undefined) {
-      return;
-    }
-    const endPointCursorPos = this.mapStructureToCursorPosition(endPointInStructure);
-    this.selection = {
-      start: Math.min(this.linearPosition, endPointCursorPos),
-      end: Math.max(this.linearPosition, endPointCursorPos),
-    };
-  }
-  endSelection(mousePosition: MousePosition): void {
-    const endPointInStructure = this.mapPixelCoordinateToStructure(
-      mousePosition.x,
-      mousePosition.y,
-      false,
-    );
-
-    if (endPointInStructure === undefined) {
-      return;
-    }
-    const endPointCursorPos = this.mapStructureToCursorPosition(endPointInStructure);
-
-    // Only set selection if there's an actual range, else clear the selection (because it might have been created in updateSelection)
-    if (this.linearPosition != endPointCursorPos) {
-      this.selection = {
-        start: Math.min(this.linearPosition, endPointCursorPos),
-        end: Math.max(this.linearPosition, endPointCursorPos),
-      };
-    } else {
-      this.selection = null;
-    }
-  }
 
   constructor(
     initialPosition: number = 0,
@@ -88,7 +41,11 @@ export class CursorManager {
     this._textParser = textParser;
     this._editor = editor;
     this.measureText = ctx.measureText.bind(ctx);
-    this.mapCursorPositionToStructure();
+    this.mapLinearToStructure();
+  }
+
+  public setSelectionManager(selectionManager: any): void {
+    this._selectionManager = selectionManager;
   }
 
   public getPosition(): number {
@@ -99,16 +56,17 @@ export class CursorManager {
     position = Math.max(0, Math.min(position, this._editor.getPieceTable().length)); //ugly, find a solution
 
     this.linearPosition = position;
-    this.mapCursorPositionToStructure();
+    this.mapLinearToStructure();
 
-    // Ensure selection is cleared when cursor moves
-    this.selection = null;
+    // Clear selection when cursor moves
+    if (this._selectionManager) {
+      (this._selectionManager as any).clearSelection();
+    }
   }
 
   public moveLeft(amount: number): void {
-    if (this.selection) {
-      this.setCursorPosition(this.selection.start);
-      this.selection = null;
+    // Handle selection if there's one
+    if (this._selectionManager && (this._selectionManager as any).handleMoveLeftWithSelection()) {
       return;
     }
 
@@ -116,26 +74,25 @@ export class CursorManager {
   }
 
   public moveRight(amount: number): void {
-    if (this.selection) {
-      console.log('Collapsing selection to end');
-      this.setCursorPosition(this.selection.end);
-      this.selection = null;
+    // Handle selection if there's one
+    if (this._selectionManager && (this._selectionManager as any).handleMoveRightWithSelection()) {
       return;
     }
+
     this.setCursorPosition(this.linearPosition + amount);
   }
 
   public moveUp(): void {
-    this.getLineAdjacentCursorPosition(this.linearPosition, 'above', true);
+    this.getLineAdjacentLinearPosition(this.linearPosition, 'above', true);
   }
   public moveDown(): void {
-    this.getLineAdjacentCursorPosition(this.linearPosition, 'below', true);
+    this.getLineAdjacentLinearPosition(this.linearPosition, 'below', true);
   }
 
   //TODO:
   // - use binary search for better performance,
   // - provide hints not to search the whole range (if left or right, up or down, the cursor is probably in a line adjacent or in the same line, if left it necessarily before, etc....)
-  public mapCursorPositionToStructure(): void {
+  public mapLinearToStructure(): void {
     const cursorPosition = this.linearPosition;
     const paragraphs = this._textParser.getParagraphs();
     let structurePosition: StructurePosition = {
@@ -212,7 +169,70 @@ export class CursorManager {
     this.structurePosition = structurePosition;
   }
 
-  public getLineAdjacentCursorPosition(
+  public mapPixelCoordinateToStructure(
+    x: number,
+    y: number,
+    moveCursor: boolean = true,
+  ): StructurePosition | undefined {
+    const lineHeight = 20; // Height of each line
+    const leftMargin = this._editor.margins.left; // Left margin for the text
+    const adjustedX = x - leftMargin; // Adjust x for left margin
+    const lineIndex = Math.floor((y - this._editor.margins.top) / lineHeight);
+
+    const paragraphs = this._textParser.getParagraphs();
+
+    let accumulatedLines = 0;
+    for (let pIndex = 0; pIndex < paragraphs.length; pIndex++) {
+      const paragraph = paragraphs[pIndex];
+      if (lineIndex < accumulatedLines + paragraph.lines.length) {
+        const lineInParagraph = lineIndex - accumulatedLines;
+        const line = paragraph.lines[lineInParagraph];
+        // Now find the character index in the line based on adjustedX
+        let charIndex = 0;
+        let currentWidth = 0;
+        for (let i = 0; i < line.text.length; i++) {
+          const char = line.text[i];
+          const charWidth = this.measureText(char).width;
+          if (currentWidth + charWidth / 2 >= adjustedX) {
+            break;
+          }
+          currentWidth += charWidth;
+          charIndex++;
+        }
+        const proposed: StructurePosition = {
+          paragraphIndex: pIndex,
+          lineIndex: lineInParagraph,
+          characterIndex: charIndex,
+          pixelOffsetInLine: currentWidth,
+        };
+
+        if (moveCursor) {
+          this.structurePosition = proposed;
+          this.linearPosition = this.mapStructureToLinear({
+            paragraphIndex: pIndex,
+            lineIndex: lineInParagraph,
+            characterIndex: charIndex,
+          });
+        }
+        return proposed;
+      }
+      accumulatedLines += paragraph.lines.length;
+    }
+    return undefined;
+  }
+
+  public mapStructureToLinear(structurePos: Omit<StructurePosition, 'pixelOffsetInLine'>): number {
+    const paragraphs = this._textParser.getParagraphs();
+    const { paragraphIndex, lineIndex, characterIndex } = structurePos;
+    const targetParagraph = paragraphs[paragraphIndex];
+    if (!targetParagraph) return this.linearPosition; // Invalid paragraph index
+    if (lineIndex < 0 || lineIndex >= targetParagraph.lines.length) return this.linearPosition; // Invalid line index
+    if (characterIndex < 0 || characterIndex > targetParagraph.lines[lineIndex].length)
+      return this.linearPosition; // Invalid character index
+    return targetParagraph.offset + targetParagraph.lines[lineIndex].offset + characterIndex;
+  }
+
+  public getLineAdjacentLinearPosition(
     cursorPosition: number,
     direction: 'above' | 'below',
     moveCursor: boolean = true,
@@ -278,7 +298,6 @@ export class CursorManager {
           pixelOffsetInLine: 0,
         };
         this.linearPosition = newPos;
-        this.selection = null;
       }
       return newPos;
     }
@@ -339,73 +358,7 @@ export class CursorManager {
         pixelOffsetInLine: finalPixelOffset,
       };
       this.linearPosition = newPos;
-      this.selection = null;
     }
     return newPos;
-  }
-
-  public mapPixelCoordinateToStructure(
-    x: number,
-    y: number,
-    moveCursor: boolean = true,
-  ): StructurePosition | undefined {
-    const lineHeight = 20; // Height of each line
-    const leftMargin = this._editor.margins.left; // Left margin for the text
-    const adjustedX = x - leftMargin; // Adjust x for left margin
-    const lineIndex = Math.floor((y - this._editor.margins.top) / lineHeight);
-
-    const paragraphs = this._textParser.getParagraphs();
-
-    let accumulatedLines = 0;
-    for (let pIndex = 0; pIndex < paragraphs.length; pIndex++) {
-      const paragraph = paragraphs[pIndex];
-      if (lineIndex < accumulatedLines + paragraph.lines.length) {
-        const lineInParagraph = lineIndex - accumulatedLines;
-        const line = paragraph.lines[lineInParagraph];
-        // Now find the character index in the line based on adjustedX
-        let charIndex = 0;
-        let currentWidth = 0;
-        for (let i = 0; i < line.text.length; i++) {
-          const char = line.text[i];
-          const charWidth = this.measureText(char).width;
-          if (currentWidth + charWidth / 2 >= adjustedX) {
-            break;
-          }
-          currentWidth += charWidth;
-          charIndex++;
-        }
-        const proposed: StructurePosition = {
-          paragraphIndex: pIndex,
-          lineIndex: lineInParagraph,
-          characterIndex: charIndex,
-          pixelOffsetInLine: currentWidth,
-        };
-
-        if (moveCursor) {
-          this.structurePosition = proposed;
-          this.linearPosition = this.mapStructureToCursorPosition({
-            paragraphIndex: pIndex,
-            lineIndex: lineInParagraph,
-            characterIndex: charIndex,
-          });
-        }
-        return proposed;
-      }
-      accumulatedLines += paragraph.lines.length;
-    }
-    return undefined;
-  }
-
-  public mapStructureToCursorPosition(
-    structurePos: Omit<StructurePosition, 'pixelOffsetInLine'>,
-  ): number {
-    const paragraphs = this._textParser.getParagraphs();
-    const { paragraphIndex, lineIndex, characterIndex } = structurePos;
-    const targetParagraph = paragraphs[paragraphIndex];
-    if (!targetParagraph) return this.linearPosition; // Invalid paragraph index
-    if (lineIndex < 0 || lineIndex >= targetParagraph.lines.length) return this.linearPosition; // Invalid line index
-    if (characterIndex < 0 || characterIndex > targetParagraph.lines[lineIndex].length)
-      return this.linearPosition; // Invalid character index
-    return targetParagraph.offset + targetParagraph.lines[lineIndex].offset + characterIndex;
   }
 }
