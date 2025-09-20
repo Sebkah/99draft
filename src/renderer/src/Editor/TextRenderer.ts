@@ -187,10 +187,50 @@ export class TextRenderer {
 
     const paragraphs = this._textParser.getParagraphs();
 
+    // Draw selection highlight if present
+    if (this._editor.cursorManager.selection) {
+      const sel = this._editor.cursorManager.selection;
+      const start = sel.start;
+      const end = sel.end;
+      this.ctx.save();
+      this.ctx.fillStyle = 'rgba(56, 189, 248, 0.25)';
+
+      let yCursor = 0;
+      paragraphs.forEach((paragraph) => {
+        paragraph.lines.forEach((line) => {
+          const lineStart = paragraph.offset + line.offset;
+          const lineEnd = lineStart + line.length;
+
+          const overlStart = Math.max(start, lineStart);
+          const overlEnd = Math.min(end, lineEnd);
+
+          if (overlStart < overlEnd) {
+            const startChar = overlStart - lineStart;
+            const endChar = overlEnd - lineStart;
+
+            // measure widths
+            const startWidth = this.ctx.measureText(line.text.substring(0, startChar)).width;
+            const endWidth = this.ctx.measureText(line.text.substring(0, endChar)).width;
+            const rectX = leftMargin + startWidth;
+            const rectW = Math.max(1, endWidth - startWidth);
+            // yCursor currently at baseline for this line after translate below, so compute pre-translate
+            // We'll draw before translating, tracking yCursor manually
+            this.ctx.fillRect(rectX, yCursor, rectW, lineHeight);
+          }
+          yCursor += lineHeight;
+        });
+      });
+      this.ctx.restore();
+    }
+
     paragraphs.forEach((paragraph, pindex) => {
       paragraph.lines.forEach((line, lindex) => {
         // Render cursor if it's in the current line
-        if (structurePosition.paragraphIndex === pindex && structurePosition.lineIndex === lindex) {
+        if (
+          structurePosition.paragraphIndex === pindex &&
+          structurePosition.lineIndex === lindex &&
+          !this._editor.cursorManager.selection
+        ) {
           if (this._editor.debugConfig.showCursor) {
             this.ctx.fillRect(structurePosition.pixelOffsetInLine + leftMargin, 0, 2, lineHeight);
           }

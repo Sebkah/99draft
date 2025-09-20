@@ -21,7 +21,7 @@ const DebugPanelNew: React.FC<Props> = ({ editor }) => {
   const pieceTable = useMemo(() => editor.getPieceTable(), [editor]);
 
   const [showDebugInfo, setShowDebugInfo] = useState<boolean>(renderer?.showDebugInfo ?? true);
-  const [collapsed, setCollapsed] = useState<boolean>(false);
+  const [collapsed, setCollapsed] = useState<boolean>(true);
   const [debugConfig, setDebugConfig] = useState<DebugConfig>({ ...editor.debugConfig });
 
   useEffect(() => {

@@ -83,6 +83,43 @@ export class InputManager {
   }
 
   /**
+   * Handle copy operation (Ctrl+C)
+   * Copies the selected text to clipboard if there's a selection
+   */
+  private async handleCopy(): Promise<void> {
+    const selection = this.cursorManager.selection;
+    if (!selection) {
+      return; // Nothing to copy if no selection
+    }
+
+    const selectedText = this.pieceTable.getRangeText(
+      selection.start,
+      selection.end - selection.start,
+    );
+
+    try {
+      await navigator.clipboard.writeText(selectedText);
+    } catch (error) {
+      console.error('Failed to copy text to clipboard:', error);
+    }
+  }
+
+  /**
+   * Handle paste operation (Ctrl+V)
+   * Pastes text from clipboard at cursor position or replaces selection
+   */
+  private async handlePaste(): Promise<void> {
+    try {
+      const clipboardText = await navigator.clipboard.readText();
+      if (clipboardText) {
+        this.editor.insertText(clipboardText);
+      }
+    } catch (error) {
+      console.error('Failed to read text from clipboard:', error);
+    }
+  }
+
+  /**
    * Handles keyboard input events and performs appropriate text editing operations
    * @param event - Native keyboard event
    * @returns true if the event was handled and should be prevented, false otherwise
@@ -101,13 +138,22 @@ export class InputManager {
       return true;
     }
 
+    // Handle copy (Ctrl+C)
+    if (event.ctrlKey && event.key === 'c') {
+      this.handleCopy();
+      return true;
+    }
+
+    // Handle paste (Ctrl+V)
+    if (event.ctrlKey && event.key === 'v') {
+      this.handlePaste();
+      return true;
+    }
+
     // Handle cursor movement - Left arrow
     if (event.key === 'ArrowLeft') {
       const mul = this.computeArrowMultiplier(false);
-
-      // Current position
-      const currentPos = this.cursorManager.getPosition();
-      this.cursorManager.setCursorPosition(Math.max(0, Math.floor(currentPos - 1 * mul)));
+      this.cursorManager.moveLeft(mul);
 
       this.textRenderer.render();
       return true;
@@ -117,11 +163,8 @@ export class InputManager {
     if (event.key === 'ArrowRight') {
       const mul = this.computeArrowMultiplier(true);
 
-      // Current position
-      const currentPos = this.cursorManager.getPosition();
-      this.cursorManager.setCursorPosition(
-        Math.min(this.pieceTable.length, Math.floor(currentPos + 1 * mul)),
-      );
+      this.cursorManager.moveRight(mul);
+
       this.textRenderer.render();
       return true;
     }

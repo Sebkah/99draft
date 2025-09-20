@@ -8,10 +8,21 @@ export type StructurePosition = {
   pixelOffsetInLine: number;
 };
 
+export type MousePosition = {
+  x: number;
+  y: number;
+};
+
 export class CursorManager {
   // Manages cursor position and movement within the editor
   private _textParser: TextParser;
-  private cursorPosition: number;
+  private linearPosition: number;
+  public structurePosition: StructurePosition = {
+    paragraphIndex: -1,
+    lineIndex: -1,
+    characterIndex: -1,
+    pixelOffsetInLine: -1,
+  };
   private _editor: Editor;
 
   public selection: { start: number; end: number } | null = null;
@@ -22,12 +33,50 @@ export class CursorManager {
    * Current cursor position represented in terms of paragraph, line, character index, and pixel offset within the line
    * The TextRenderer uses this to draw the cursor at the correct position
    */
-  public structurePosition: StructurePosition = {
-    paragraphIndex: -1,
-    lineIndex: -1,
-    characterIndex: -1,
-    pixelOffsetInLine: -1,
-  };
+
+  startSelection(mousePosition: MousePosition): void {
+    this.selection = null;
+
+    this.mapPixelCoordinateToStructure(mousePosition.x, mousePosition.y, true);
+  }
+
+  updateSelection(mousePosition: MousePosition): void {
+    const endPointInStructure = this.mapPixelCoordinateToStructure(
+      mousePosition.x,
+      mousePosition.y,
+      false,
+    );
+    if (endPointInStructure === undefined) {
+      return;
+    }
+    const endPointCursorPos = this.mapStructureToCursorPosition(endPointInStructure);
+    this.selection = {
+      start: Math.min(this.linearPosition, endPointCursorPos),
+      end: Math.max(this.linearPosition, endPointCursorPos),
+    };
+  }
+  endSelection(mousePosition: MousePosition): void {
+    const endPointInStructure = this.mapPixelCoordinateToStructure(
+      mousePosition.x,
+      mousePosition.y,
+      false,
+    );
+
+    if (endPointInStructure === undefined) {
+      return;
+    }
+    const endPointCursorPos = this.mapStructureToCursorPosition(endPointInStructure);
+
+    // Only set selection if there's an actual range, else clear the selection (because it might have been created in updateSelection)
+    if (this.linearPosition != endPointCursorPos) {
+      this.selection = {
+        start: Math.min(this.linearPosition, endPointCursorPos),
+        end: Math.max(this.linearPosition, endPointCursorPos),
+      };
+    } else {
+      this.selection = null;
+    }
+  }
 
   constructor(
     initialPosition: number = 0,
@@ -35,7 +84,7 @@ export class CursorManager {
     ctx: CanvasRenderingContext2D,
     editor: Editor,
   ) {
-    this.cursorPosition = initialPosition;
+    this.linearPosition = initialPosition;
     this._textParser = textParser;
     this._editor = editor;
     this.measureText = ctx.measureText.bind(ctx);
@@ -43,28 +92,51 @@ export class CursorManager {
   }
 
   public getPosition(): number {
-    return this.cursorPosition;
+    return this.linearPosition;
   }
 
   public setCursorPosition(position: number): void {
-    this.cursorPosition = position;
+    position = Math.max(0, Math.min(position, this._editor.getPieceTable().length)); //ugly, find a solution
+
+    this.linearPosition = position;
     this.mapCursorPositionToStructure();
+
+    // Ensure selection is cleared when cursor moves
+    this.selection = null;
+  }
+
+  public moveLeft(amount: number): void {
+    if (this.selection) {
+      this.setCursorPosition(this.selection.start);
+      this.selection = null;
+      return;
+    }
+
+    this.setCursorPosition(this.linearPosition - amount);
+  }
+
+  public moveRight(amount: number): void {
+    if (this.selection) {
+      console.log('Collapsing selection to end');
+      this.setCursorPosition(this.selection.end);
+      this.selection = null;
+      return;
+    }
+    this.setCursorPosition(this.linearPosition + amount);
   }
 
   public moveUp(): void {
-    const newPos = this.getLineAdjacentCursorPosition(this.cursorPosition, 'above');
-    this.setCursorPosition(newPos);
+    this.getLineAdjacentCursorPosition(this.linearPosition, 'above', true);
   }
   public moveDown(): void {
-    const newPos = this.getLineAdjacentCursorPosition(this.cursorPosition, 'below');
-    this.setCursorPosition(newPos);
+    this.getLineAdjacentCursorPosition(this.linearPosition, 'below', true);
   }
 
   //TODO:
   // - use binary search for better performance,
   // - provide hints not to search the whole range (if left or right, up or down, the cursor is probably in a line adjacent or in the same line, if left it necessarily before, etc....)
   public mapCursorPositionToStructure(): void {
-    const cursorPosition = this.cursorPosition;
+    const cursorPosition = this.linearPosition;
     const paragraphs = this._textParser.getParagraphs();
     let structurePosition: StructurePosition = {
       paragraphIndex: -1,
@@ -195,6 +267,22 @@ export class CursorManager {
     // Now find the character index in the target line based on pixelOffset
     const line = targetParagraph.lines[targetLine];
 
+    // Handle empty line quickly
+    if (!line.text || line.text.length === 0) {
+      const newPos = targetParagraph.offset + line.offset;
+      if (moveCursor) {
+        this.structurePosition = {
+          paragraphIndex: targetParagraphIndex,
+          lineIndex: targetLine,
+          characterIndex: 0,
+          pixelOffsetInLine: 0,
+        };
+        this.linearPosition = newPos;
+        this.selection = null;
+      }
+      return newPos;
+    }
+
     // First step through the words to find the closest word boundary
     let wordIndex = 0;
     for (let i = 0; i < line.wordpixelOffsets.length; i++) {
@@ -207,6 +295,8 @@ export class CursorManager {
     // Start from the beginning of the identified word
     let accumulatedWidth = line.wordpixelOffsets[wordIndex];
     let charIndex = line.wordCharOffsets[wordIndex];
+    let decided = false;
+    let finalPixelOffset = accumulatedWidth;
 
     // Add characters one by one until we reach or exceed the pixelOffset
     for (let i = line.wordCharOffsets[wordIndex]; i < line.text.length; i++) {
@@ -214,38 +304,44 @@ export class CursorManager {
       const charWidth = this.measureText(char).width;
       const nextAccumulatedWidth = accumulatedWidth + charWidth;
 
-      // If adding this character would exceed the pixelOffset
       if (nextAccumulatedWidth > pixelOffsetInLine) {
-        // Check if the current position or next position is closer to the pixelOffset
         const distanceToCurrent = Math.abs(accumulatedWidth - pixelOffsetInLine);
         const distanceToNext = Math.abs(nextAccumulatedWidth - pixelOffsetInLine);
 
         if (distanceToNext < distanceToCurrent) {
-          // Next position is closer, move to it
           charIndex = i + 1;
+          finalPixelOffset = nextAccumulatedWidth;
         } else {
-          // Current position is closer, stay here
           charIndex = i;
+          finalPixelOffset = accumulatedWidth;
         }
+        decided = true;
         break;
       }
 
-      // Move to the next character
       accumulatedWidth = nextAccumulatedWidth;
       charIndex = i + 1;
+      finalPixelOffset = accumulatedWidth;
     }
 
+    // If we never exceeded pixelOffset, place cursor at end of line
+    if (!decided) {
+      charIndex = Math.min(charIndex, line.text.length);
+      finalPixelOffset = accumulatedWidth;
+    }
+
+    const newPos = targetParagraph.offset + targetParagraph.lines[targetLine].offset + charIndex;
     if (moveCursor) {
-      // Update the internal structure position to reflect the new cursor position
       this.structurePosition = {
         paragraphIndex: targetParagraphIndex,
         lineIndex: targetLine,
         characterIndex: charIndex,
-        pixelOffsetInLine: accumulatedWidth,
+        pixelOffsetInLine: finalPixelOffset,
       };
+      this.linearPosition = newPos;
+      this.selection = null;
     }
-
-    return targetParagraph.offset + targetParagraph.lines[targetLine].offset + charIndex;
+    return newPos;
   }
 
   public mapPixelCoordinateToStructure(
@@ -287,11 +383,11 @@ export class CursorManager {
 
         if (moveCursor) {
           this.structurePosition = proposed;
-          this.cursorPosition = this.mapStructureToCursorPosition(
-            pIndex,
-            lineInParagraph,
-            charIndex,
-          );
+          this.linearPosition = this.mapStructureToCursorPosition({
+            paragraphIndex: pIndex,
+            lineIndex: lineInParagraph,
+            characterIndex: charIndex,
+          });
         }
         return proposed;
       }
@@ -301,16 +397,15 @@ export class CursorManager {
   }
 
   public mapStructureToCursorPosition(
-    paragraphIndex: number,
-    lineIndex: number,
-    charIndex: number,
+    structurePos: Omit<StructurePosition, 'pixelOffsetInLine'>,
   ): number {
     const paragraphs = this._textParser.getParagraphs();
+    const { paragraphIndex, lineIndex, characterIndex } = structurePos;
     const targetParagraph = paragraphs[paragraphIndex];
-    if (!targetParagraph) return this.cursorPosition; // Invalid paragraph index
-    if (lineIndex < 0 || lineIndex >= targetParagraph.lines.length) return this.cursorPosition; // Invalid line index
-    if (charIndex < 0 || charIndex > targetParagraph.lines[lineIndex].length)
-      return this.cursorPosition; // Invalid character index
-    return targetParagraph.offset + targetParagraph.lines[lineIndex].offset + charIndex;
+    if (!targetParagraph) return this.linearPosition; // Invalid paragraph index
+    if (lineIndex < 0 || lineIndex >= targetParagraph.lines.length) return this.linearPosition; // Invalid line index
+    if (characterIndex < 0 || characterIndex > targetParagraph.lines[lineIndex].length)
+      return this.linearPosition; // Invalid character index
+    return targetParagraph.offset + targetParagraph.lines[lineIndex].offset + characterIndex;
   }
 }

@@ -71,11 +71,6 @@ const Canvas = () => {
     editor.setMargins(leftMargin, newRightMargin);
   };
 
-  const handleClick = (event: React.MouseEvent<HTMLCanvasElement, MouseEvent>) => {
-    if (!editor) return;
-    editor.handleClick(event.nativeEvent.offsetX, event.nativeEvent.offsetY);
-  };
-
   return (
     <>
       {/* Main text editor canvas */}
@@ -91,9 +86,21 @@ const Canvas = () => {
           ref={canvasRef}
           tabIndex={0} // Make canvas focusable for keyboard input
           width={editorWidth}
-          height={400}
+          height={1000}
           onKeyDown={handleKeyDown}
-          onClick={handleClick}
+          onPointerMove={(e) => {
+            if (!editor || !e.buttons) return;
+            editor.updateSelection({ x: e.nativeEvent.offsetX, y: e.nativeEvent.offsetY });
+          }}
+          onPointerDown={(e) => {
+            if (!editor) return;
+            editor.startSelection({ x: e.nativeEvent.offsetX, y: e.nativeEvent.offsetY });
+          }}
+          onPointerUp={(e) => {
+            if (!editor) return;
+            editor.endSelection({ x: e.nativeEvent.offsetX, y: e.nativeEvent.offsetY });
+          }}
+          onDragEndCapture={(e) => console.log(e)}
           className="bg-white pointer-events-auto shadow-lg focus:outline-none "
         />
       </div>

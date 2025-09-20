@@ -2,7 +2,8 @@ import { PieceTable } from './PieceTable/PieceTable';
 import { TextRenderer } from './TextRenderer';
 import { InputManager } from './Input/InputManager';
 import { TextParser } from './TextParser';
-import { CursorManager, StructurePosition } from './CursorManager';
+import { CursorManager, MousePosition, StructurePosition } from './CursorManager';
+import { m } from 'motion/dist/react';
 
 /**
  * Type definition for debugging piece table structure
@@ -72,9 +73,9 @@ export class Editor {
     // Initialize debug configuration with default values
     this.debugConfig = {
       showWordOffsets: false,
-      showLineInfo: true,
-      showParagraphBounds: true,
-      showCursor: true,
+      showLineInfo: false,
+      showParagraphBounds: false,
+      showCursor: false,
       wordDisplayMode: 'charOffset',
     };
 
@@ -111,10 +112,16 @@ export class Editor {
     return this.inputManager.handleKeyDown(event);
   }
 
-  handleClick(x: number, y: number): void {
-    this.cursorManager.mapPixelCoordinateToStructure(x, y, true);
-
-    this.emitDebugUpdate();
+  startSelection(mousePosition: MousePosition): void {
+    this.cursorManager.startSelection(mousePosition);
+    this.textRenderer.render();
+  }
+  updateSelection(mousePosition: MousePosition): void {
+    this.cursorManager.updateSelection(mousePosition);
+    this.textRenderer.render();
+  }
+  endSelection(mousePosition: MousePosition): void {
+    this.cursorManager.endSelection(mousePosition);
     this.textRenderer.render();
   }
 
@@ -172,8 +179,28 @@ export class Editor {
   //TODO: enable inserting and deleting at arbitrary positions
 
   insertText(text: string): void {
-    if (text.includes('\n')) {
-      console.warn('Inserting text with newlines is not supported yet.');
+    // If it's not just one letter
+    const parts = text.split('\n');
+
+    if (this.cursorManager.selection) {
+      const start = this.cursorManager.selection.start;
+      const end = this.cursorManager.selection.end;
+      this.pieceTable.delete(start, end - start);
+      this.cursorManager.setCursorPosition(start);
+      this.cursorManager.selection = null;
+    }
+
+    if (parts.length > 1) {
+      // Split it around the line breaks
+      // Insert each part separately with line breaks in between
+      parts.forEach((part, index) => {
+        if (part.length > 0) {
+          this.insertText(part);
+        }
+        if (index < parts.length - 1) {
+          this.insertLineBreak();
+        }
+      });
       return;
     }
 
@@ -192,6 +219,20 @@ export class Editor {
 
   //TODO: this should also do partial reparsing, but we need to be carefull if we delete newlines
   deleteText(length: number): void {
+    if (this.cursorManager.selection) {
+      const start = this.cursorManager.selection.start;
+      const end = this.cursorManager.selection.end;
+      this.pieceTable.delete(start, end - start);
+      this.cursorManager.setCursorPosition(start);
+      this.cursorManager.selection = null;
+      this.textParser.splitIntoParagraphs();
+      this.textParser.splitAllParagraphsIntoLines();
+      this.cursorManager.mapCursorPositionToStructure();
+      this.textRenderer.render();
+      this.emitDebugUpdate();
+      return;
+    }
+
     if (this.cursorPosition > 0) {
       this.pieceTable.delete(this.cursorPosition - 1, length);
 
