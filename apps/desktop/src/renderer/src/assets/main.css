@@ -1,0 +1,13 @@
+/* Basic app styles - Tailwind will be handled by the React package */
+
+body {
+  height: 100vh;
+  width: 100vw;
+  margin: 0;
+  padding: 0;
+}
+
+#root {
+  height: 100vh;
+  width: 100vw;
+}

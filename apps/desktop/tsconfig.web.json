@@ -10,10 +10,13 @@
     "composite": true,
     "jsx": "react-jsx",
     "baseUrl": ".",
+    "moduleResolution": "bundler",
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
     "paths": {
-      "@renderer/*": [
-        "src/renderer/src/*"
-      ]
+      "@renderer/*": ["src/renderer/src/*"],
+      "@99draft/editor-core": ["../../packages/editor-core/src"],
+      "@99draft/editor-react": ["../../packages/editor-react/src"]
     }
   }
 }

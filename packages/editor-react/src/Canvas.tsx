@@ -1,9 +1,9 @@
-import { Editor } from '@renderer/Editor/Editor';
+import { Editor } from '@99draft/editor-core';
 
 import Ruler from './Ruler';
 
-import React, { useEffect, useRef, useState, useLayoutEffect, use } from 'react';
-import { baseText } from '@renderer/assets/baseText';
+import React, { useEffect, useRef, useState, useLayoutEffect } from 'react';
+import { baseText } from './assets/baseText';
 import DebugPanelNew from './DebugPanelNew';
 
 const editorWidth = 800;

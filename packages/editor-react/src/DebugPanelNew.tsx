@@ -1,7 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { motion } from 'motion/react';
-import { Editor, PieceDebug, DebugConfig } from '@renderer/Editor/Editor';
-import { StructurePosition } from '@renderer/Editor/CursorManager';
+import { Editor, PieceDebug, DebugConfig, StructurePosition } from '@99draft/editor-core';
 
 type Props = {
   editor: Editor;
