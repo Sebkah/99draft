@@ -7,8 +7,8 @@ import { Paragraph } from './Paragraph';
 export class Page {
   private startParagraphIdx: number;
   private endParagraphIdx: number;
-  private startLineIdx: number;
-  private endLineIdx: number;
+  private startLineIdx: number; // Line index within the start paragraph
+  private endLineIdx: number; // Line index within the end paragraph
 
   constructor(
     startParagraphIndex: number,

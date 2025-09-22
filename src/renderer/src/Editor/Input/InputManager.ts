@@ -141,7 +141,7 @@ export class InputManager {
       const mul = this.computeArrowMultiplier(false);
       this.cursorManager.moveLeft(mul);
 
-      this.textRenderer.render();
+      this.editor.renderPages();
       return true;
     }
 
@@ -151,22 +151,25 @@ export class InputManager {
 
       this.cursorManager.moveRight(mul);
 
-      this.textRenderer.render();
+      this.editor.renderPages();
       return true;
     }
 
-    if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
-      if (event.key === 'ArrowUp') {
-        this.cursorManager.moveUp();
-      } else {
-        this.cursorManager.moveDown();
-      }
-      this.textRenderer.render();
+    if (event.key === 'ArrowUp') {
+      this.cursorManager.moveUp();
+      this.editor.renderPages();
+      return true;
     }
+
+    if (event.key === 'ArrowDown') {
+      this.cursorManager.moveDown();
+      this.editor.renderPages();
+      return true;
+    }
+
     // Handle printable character input
     if (event.key.length === 1 && !event.ctrlKey && !event.metaKey) {
       this.editor.insertText(event.key);
-
       return true;
     }
 

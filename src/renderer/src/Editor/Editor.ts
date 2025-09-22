@@ -4,6 +4,7 @@ import { InputManager } from './Input/InputManager';
 import { TextParser } from './TextParser';
 import { CursorManager, MousePosition } from './CursorManager';
 import { SelectionManager } from './SelectionManager';
+import { createEditorLogger, type EditorLogger } from './EditorLogger';
 
 /**
  * Type definition for debugging piece table structure
@@ -17,13 +18,24 @@ export type PieceDebug = {
 
 /**
  * Debug configuration for controlling visibility of different debug visualizations
+ * and logging categories
  */
 export interface DebugConfig {
+  // Visual debug controls
   showWordOffsets: boolean;
   showLineInfo: boolean;
   showParagraphBounds: boolean;
   showCursor: boolean;
   wordDisplayMode: 'index' | 'charOffset' | 'pixelOffset';
+
+  // Logging debug controls
+  logging: {
+    pageManagement: boolean;
+    rendering: boolean;
+    canvasLinking: boolean;
+    cursorOperations: boolean;
+    textBuffer: boolean;
+  };
 }
 
 type Margins = {
@@ -63,6 +75,7 @@ export class Editor {
     bottom: 50,
   };
   public debugConfig: DebugConfig;
+  public logger: EditorLogger;
 
   private internalCanvas: HTMLCanvasElement;
   private debugUpdateCallback?: (pieces: PieceDebug[]) => void;
@@ -93,9 +106,6 @@ export class Editor {
     // Set font for internal canvas context to match rendering font
     ctx.font = '16px Arial';
 
-    // Initialize piece table with provided text
-    this.pieceTable = new PieceTable(initialText);
-
     // Set initial margins if provided
     if (margins.left !== undefined) this.margins.left = margins.left;
     if (margins.right !== undefined) this.margins.right = margins.right;
@@ -109,7 +119,20 @@ export class Editor {
       showParagraphBounds: false,
       showCursor: true,
       wordDisplayMode: 'charOffset',
+      logging: {
+        pageManagement: false,
+        rendering: false,
+        canvasLinking: false,
+        cursorOperations: false,
+        textBuffer: false,
+      },
     };
+
+    // Initialize logger with access to debug config
+    this.logger = createEditorLogger(() => this.debugConfig);
+
+    // Initialize piece table with provided text and logger
+    this.pieceTable = new PieceTable(initialText, this.logger);
 
     // Initialize text renderer and input manager
     this.textParser = new TextParser(this.pieceTable, ctx, this);
@@ -132,7 +155,13 @@ export class Editor {
   linkCanvases(canvases: HTMLCanvasElement[] | null): void {
     if (!canvases || canvases.length === 0) return;
 
-    console.log('Linking canvases:', canvases.length, 'canvases for', this.numberOfPages, 'pages');
+    this.logger.canvasLinking(
+      'Linking canvases:',
+      canvases.length,
+      'canvases for',
+      this.numberOfPages,
+      'pages',
+    );
 
     const ctxs = canvases
       .map((canvas) => canvas.getContext('2d'))
@@ -150,7 +179,7 @@ export class Editor {
    * Used when the number of pages changes and canvases are recreated
    */
   relinkCanvases(canvases: HTMLCanvasElement[]): void {
-    console.log(
+    this.logger.canvasLinking(
       'Re-linking canvases:',
       canvases.length,
       'canvases for',
@@ -349,6 +378,7 @@ export class Editor {
 
       this.textParser.splitIntoParagraphs();
       this.textParser.splitAllParagraphsIntoLines();
+      this.textParser.splitParagraphsIntoPages();
 
       this.cursorManager.mapLinearToStructure();
       this.renderPages();

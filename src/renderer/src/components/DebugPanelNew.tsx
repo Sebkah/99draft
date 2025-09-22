@@ -39,7 +39,7 @@ const DebugPanelNew: React.FC<Props> = ({ editor }) => {
   }, [editor]);
 
   const rerender = () => {
-    renderer?.render();
+    editor.renderPages();
   };
 
   const toggle = (key: keyof DebugConfig) => (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -48,6 +48,20 @@ const DebugPanelNew: React.FC<Props> = ({ editor }) => {
     editor.debugConfig = next;
     rerender();
   };
+
+  const toggleLogging =
+    (key: keyof DebugConfig['logging']) => (e: React.ChangeEvent<HTMLInputElement>) => {
+      const next = {
+        ...debugConfig,
+        logging: {
+          ...debugConfig.logging,
+          [key]: e.target.checked,
+        },
+      } as DebugConfig;
+      setDebugConfig(next);
+      editor.debugConfig = next;
+      // No need to rerender for logging changes
+    };
 
   const setWordMode = (mode: DebugConfig['wordDisplayMode']) => {
     const next = { ...debugConfig, wordDisplayMode: mode };
@@ -61,7 +75,7 @@ const DebugPanelNew: React.FC<Props> = ({ editor }) => {
     setShowDebugInfo(val);
     if (renderer) {
       renderer.showDebugInfo = val;
-      renderer.render();
+      editor.renderPages();
     }
   };
 
@@ -188,6 +202,44 @@ const DebugPanelNew: React.FC<Props> = ({ editor }) => {
           </div>
         </Section>
 
+        <Section title="Debug Logging" accent="fuchsia">
+          <ToggleRow label="Page Management">
+            <Switch
+              checked={debugConfig.logging.pageManagement}
+              onChange={toggleLogging('pageManagement')}
+              accent="fuchsia"
+            />
+          </ToggleRow>
+          <ToggleRow label="Rendering">
+            <Switch
+              checked={debugConfig.logging.rendering}
+              onChange={toggleLogging('rendering')}
+              accent="fuchsia"
+            />
+          </ToggleRow>
+          <ToggleRow label="Canvas Linking">
+            <Switch
+              checked={debugConfig.logging.canvasLinking}
+              onChange={toggleLogging('canvasLinking')}
+              accent="fuchsia"
+            />
+          </ToggleRow>
+          <ToggleRow label="Cursor Operations">
+            <Switch
+              checked={debugConfig.logging.cursorOperations}
+              onChange={toggleLogging('cursorOperations')}
+              accent="fuchsia"
+            />
+          </ToggleRow>
+          <ToggleRow label="Text Buffer">
+            <Switch
+              checked={debugConfig.logging.textBuffer}
+              onChange={toggleLogging('textBuffer')}
+              accent="fuchsia"
+            />
+          </ToggleRow>
+        </Section>
+
         <Section title="Layout" accent="amber">
           <div className="grid grid-cols-2 gap-2 text-sm">
             <div className="text-xs opacity-80">Left margin</div>
@@ -213,8 +265,8 @@ const DebugPanelNew: React.FC<Props> = ({ editor }) => {
             const addPieces = pieces.filter((p) => p.source === 'add');
             const originalChars = originalPieces.reduce((acc, p) => acc + p.length, 0);
             const addChars = addPieces.reduce((acc, p) => acc + p.length, 0);
-            const addBufferLen = pieceTable.addBuffer.length;
-            const originalBufferLen = pieceTable.originalBuffer.length;
+            const addBufferLen = pieceTable.getAddBuffer().length;
+            const originalBufferLen = pieceTable.getOriginalBuffer().length;
             return (
               <div className="grid grid-cols-2 gap-2">
                 <div className="opacity-80">Doc length</div>
@@ -249,11 +301,11 @@ const DebugPanelNew: React.FC<Props> = ({ editor }) => {
                   onMouseEnter={() => {
                     renderer?.setHoveredParagraph(pindex);
                     renderer?.setHoveredLine(null);
-                    renderer?.render();
+                    editor.renderPages();
                   }}
                   onMouseLeave={() => {
                     renderer?.setHoveredParagraph(null);
-                    renderer?.render();
+                    editor.renderPages();
                   }}
                 >
                   <div className="flex items-center gap-2">
@@ -275,7 +327,7 @@ const DebugPanelNew: React.FC<Props> = ({ editor }) => {
                         onMouseEnter={(e) => {
                           renderer?.setHoveredParagraph(pindex);
                           renderer?.setHoveredLine(pindex, lindex);
-                          renderer?.render();
+                          editor.renderPages();
                           const container = structuresRef.current;
                           if (container) {
                             const tileRect = (
@@ -309,7 +361,7 @@ const DebugPanelNew: React.FC<Props> = ({ editor }) => {
                         }}
                         onMouseLeave={() => {
                           renderer?.setHoveredLine(null);
-                          renderer?.render();
+                          editor.renderPages();
                           setHoverInfo(null);
                         }}
                         title={`Line ${lindex}`}
@@ -351,7 +403,7 @@ const DebugPanelNew: React.FC<Props> = ({ editor }) => {
           {(() => {
             const addPiecesCount = pieces.filter((p) => p.source === 'add').length;
             const originalPiecesCount = pieces.length - addPiecesCount;
-            const addBufferLen = pieceTable.addBuffer.length;
+            const addBufferLen = pieceTable.getAddBuffer().length;
             return (
               <div className="mb-2 space-y-2">
                 <div className="flex flex-wrap items-center gap-2">
@@ -370,7 +422,7 @@ const DebugPanelNew: React.FC<Props> = ({ editor }) => {
                     {(() => {
                       const maxPreview = 120;
                       const start = Math.max(0, addBufferLen - maxPreview);
-                      const tail = pieceTable.addBuffer.slice(start);
+                      const tail = pieceTable.getAddBuffer().slice(start);
                       const parts = tail.split('\n');
                       return (
                         <>

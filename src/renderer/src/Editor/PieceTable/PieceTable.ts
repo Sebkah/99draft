@@ -1,3 +1,5 @@
+import type { EditorLogger } from '../EditorLogger';
+
 /**
  * Represents a single, contiguous piece of text from one of the buffers.
  */
@@ -39,6 +41,11 @@ export class PieceTable {
   private addBufferLength: number = 0;
 
   /**
+   * Logger instance for debug output
+   */
+  private logger?: EditorLogger;
+
+  /**
    * Version counter that increments with each modification.
    * Used to track when the text has changed for optimizing parsing.
    */
@@ -49,10 +56,12 @@ export class PieceTable {
   /**
    * Initializes the Piece Table with the original document content.
    * @param originalContent The initial text of the document.
+   * @param logger Optional logger for debug output.
    */
-  constructor(originalContent: string) {
+  constructor(originalContent: string, logger?: EditorLogger) {
     this.originalBuffer = originalContent;
     this.addBuffer = '';
+    this.logger = logger;
 
     this.documentLength = originalContent.length;
 
@@ -526,7 +535,7 @@ export class PieceTable {
 
     // Case 2A: Remove the entire piece
     if (start === 0 && end === piece.length) {
-      console.log('Deleting entire piece');
+      this.logger?.textBuffer('Deleting entire piece');
       this.pieces.splice(pieceIndex, 1);
       this.documentLength -= piece.length;
       return; // Added return to prevent fallthrough

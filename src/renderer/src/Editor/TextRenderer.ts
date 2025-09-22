@@ -52,6 +52,82 @@ export class TextRenderer {
     ctx.fillStyle = 'black';
   }
 
+  // Render cursor for the current line if conditions are met
+  private renderCursor(
+    ctx: CanvasRenderingContext2D,
+    pageIndex: number,
+    absoluteParagraphIndex: number,
+    lindex: number,
+    leftMargin: number,
+    lineHeight: number,
+  ): void {
+    const structurePosition = this.editor.cursorManager.structurePosition;
+
+    // Render cursor if it's in the current line and on the current page
+    if (
+      structurePosition.pageIndex === pageIndex &&
+      structurePosition.paragraphIndex === absoluteParagraphIndex &&
+      structurePosition.lineIndex === lindex &&
+      !this.editor.selectionManager.hasSelection()
+    ) {
+      if (this.editor.debugConfig.showCursor) {
+        ctx.fillRect(structurePosition.pixelOffsetInLine + leftMargin, 0, 2, lineHeight);
+      }
+    }
+  }
+
+  // Render selection highlight if present
+  private renderSelection(
+    ctx: CanvasRenderingContext2D,
+    paragraphs: any[],
+    startLineIndex: number,
+    endLineIndex: number,
+    leftMargin: number,
+    lineHeight: number,
+  ): void {
+    if (!this.editor.selectionManager.hasSelection()) {
+      return;
+    }
+
+    const sel = this.editor.selectionManager.getSelection()!;
+    const start = sel.start;
+    const end = sel.end;
+    ctx.save();
+    ctx.fillStyle = 'rgba(56, 189, 248, 0.25)';
+
+    paragraphs.forEach((paragraph) => {
+      paragraph.lines.forEach((line: any, index: number) => {
+        // Only consider lines within the page's line range
+        if (
+          (paragraph === paragraphs[0] && index < startLineIndex) ||
+          (paragraph === paragraphs[paragraphs.length - 1] && index > endLineIndex)
+        ) {
+          return;
+        }
+        const lineStart = paragraph.offset + line.offset;
+        const lineEnd = lineStart + line.length;
+
+        const overlStart = Math.max(start, lineStart);
+        const overlEnd = Math.min(end, lineEnd);
+
+        if (overlStart < overlEnd) {
+          const startChar = overlStart - lineStart;
+          const endChar = overlEnd - lineStart;
+
+          // measure widths
+          const startWidth = ctx.measureText(line.text.substring(0, startChar)).width;
+          const endWidth = ctx.measureText(line.text.substring(0, endChar)).width;
+          const rectX = leftMargin + startWidth;
+          const rectW = Math.max(1, endWidth - startWidth);
+          // Draw selection rectangle at current transform position
+          ctx.fillRect(rectX, 0, rectW, lineHeight);
+        }
+        ctx.translate(0, lineHeight);
+      });
+    });
+    ctx.restore();
+  }
+
   // Render debug information for paragraphs, lines, and cursor position
   private renderDebugInfo(ctx: CanvasRenderingContext2D, lineHeight: number): void {
     // Save the current context state to avoid interference with main text rendering
@@ -174,7 +250,7 @@ export class TextRenderer {
   public render(pageIndex: number): void {
     const ctx = this.ctxs[pageIndex];
     const pages = this.textParser.getPages();
-    console.log(
+    this.editor.logger.rendering(
       'Rendering page',
       pageIndex,
       'of',
@@ -184,7 +260,8 @@ export class TextRenderer {
     );
 
     if (!ctx) {
-      console.warn(
+      this.editor.logger.warn(
+        'rendering',
         `No context available for page ${pageIndex}. Available contexts:`,
         this.ctxs.length,
       );
@@ -192,7 +269,6 @@ export class TextRenderer {
     }
 
     const leftMargin = this.editor.margins.left; // Left margin for the text
-    const structurePosition = this.editor.cursorManager.structurePosition;
     const lineHeight = 20; // Height of each line
     ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
 
@@ -205,87 +281,47 @@ export class TextRenderer {
 
     const page = pages[pageIndex];
     if (!page) {
-      console.warn(`No page data available for page ${pageIndex}`);
+      this.editor.logger.warn('rendering', `No page data available for page ${pageIndex}`);
       return;
     }
 
-    console.log(`Page ${pageIndex} data:`, {
+    this.editor.logger.rendering(`Page ${pageIndex} data:`, {
       startParagraphIndex: page.startParagraphIndex,
       endParagraphIndex: page.endParagraphIndex,
       startLineIndex: page.startLineIndex,
       endLineIndex: page.endLineIndex,
     });
 
-    const paragraphs = this.textParser
-      .getParagraphs()
-      .slice(page.startParagraphIndex, page.endParagraphIndex + 1);
-
+    const allParagraphs = this.textParser.getParagraphs();
     const startLineIndex = page.startLineIndex;
     const endLineIndex = page.endLineIndex;
 
+    // Create paragraphs array for selection rendering (keeping this for compatibility)
+    const paragraphs = allParagraphs.slice(page.startParagraphIndex, page.endParagraphIndex + 1);
+
     // Draw selection highlight if present
-    if (this.editor.selectionManager.hasSelection()) {
-      const sel = this.editor.selectionManager.getSelection()!;
-      const start = sel.start;
-      const end = sel.end;
-      ctx.save();
-      ctx.fillStyle = 'rgba(56, 189, 248, 0.25)';
+    this.renderSelection(ctx, paragraphs, startLineIndex, endLineIndex, leftMargin, lineHeight);
 
-      let yCursor = 0;
-      paragraphs.forEach((paragraph) => {
-        paragraph.lines.forEach((line, index) => {
-          // Only consider lines within the page's line range
-          if (
-            (paragraph === paragraphs[0] && index < startLineIndex) ||
-            (paragraph === paragraphs[paragraphs.length - 1] && index > endLineIndex)
-          ) {
-            return;
-          }
-          const lineStart = paragraph.offset + line.offset;
-          const lineEnd = lineStart + line.length;
+    for (let i = page.startParagraphIndex; i <= page.endParagraphIndex; i++) {
+      const paragraph = allParagraphs[i];
 
-          const overlStart = Math.max(start, lineStart);
-          const overlEnd = Math.min(end, lineEnd);
+      // Safety check: Skip if paragraph is undefined (can happen during text deletion)
+      if (!paragraph || !paragraph.lines) {
+        console.warn(`Paragraph at index ${i} is undefined or has no lines. Skipping rendering.`);
+        continue;
+      }
 
-          if (overlStart < overlEnd) {
-            const startChar = overlStart - lineStart;
-            const endChar = overlEnd - lineStart;
-
-            // measure widths
-            const startWidth = ctx.measureText(line.text.substring(0, startChar)).width;
-            const endWidth = ctx.measureText(line.text.substring(0, endChar)).width;
-            const rectX = leftMargin + startWidth;
-            const rectW = Math.max(1, endWidth - startWidth);
-            // yCursor currently at baseline for this line after translate below, so compute pre-translate
-            // We'll draw before translating, tracking yCursor manually
-            ctx.fillRect(rectX, yCursor, rectW, lineHeight);
-          }
-          yCursor += lineHeight;
-        });
-      });
-      ctx.restore();
-    }
-
-    paragraphs.forEach((paragraph, pindex) => {
       paragraph.lines.forEach((line, lindex) => {
         // Only render lines within the page's line range
         if (
-          (paragraph === paragraphs[0] && lindex < startLineIndex) ||
-          (paragraph === paragraphs[paragraphs.length - 1] && lindex > endLineIndex)
+          (i === page.startParagraphIndex && lindex < startLineIndex) ||
+          (i === page.endParagraphIndex && lindex > endLineIndex)
         ) {
           return;
         }
 
-        // Render cursor if it's in the current line
-        if (
-          structurePosition.paragraphIndex === pindex &&
-          structurePosition.lineIndex === lindex &&
-          !this.editor.selectionManager.hasSelection()
-        ) {
-          if (this.editor.debugConfig.showCursor) {
-            ctx.fillRect(structurePosition.pixelOffsetInLine + leftMargin, 0, 2, lineHeight);
-          }
-        }
+        // Render cursor if it's in the current line and on the current page
+        this.renderCursor(ctx, pageIndex, i, lindex, leftMargin, lineHeight);
 
         if (this.justifyText) {
           const lineLenghtRest = this.editor.wrappingWidth - line.pixelLength;
@@ -300,7 +336,7 @@ export class TextRenderer {
         ctx.translate(0, lineHeight);
         this.renderLine(ctx, line.text, leftMargin, 0);
       });
-    });
+    }
 
     ctx.restore();
 

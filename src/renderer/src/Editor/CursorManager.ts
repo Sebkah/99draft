@@ -5,6 +5,7 @@ import { TextParser } from './TextParser';
 class SelectionManager {}
 
 export type StructurePosition = {
+  pageIndex: number;
   paragraphIndex: number;
   lineIndex: number;
   characterIndex: number;
@@ -22,6 +23,7 @@ export class CursorManager {
   private textParser: TextParser;
   private linearPosition: number;
   public structurePosition: StructurePosition = {
+    pageIndex: -1,
     paragraphIndex: -1,
     lineIndex: -1,
     characterIndex: -1,
@@ -97,6 +99,7 @@ export class CursorManager {
     const cursorPosition = this.linearPosition;
     const paragraphs = this.textParser.getParagraphs();
     let structurePosition: StructurePosition = {
+      pageIndex: -1,
       paragraphIndex: -1,
       lineIndex: -1,
       characterIndex: -1,
@@ -167,27 +170,67 @@ export class CursorManager {
       structurePosition.characterIndex = positionInLine; // Character index within the line
       structurePosition.pixelOffsetInLine = metrics.width; // Offset in pixels within the line
     }
+
+    // 4. Determine the page index
+    const pages = this.textParser.getPages();
+    let pageIndex = -1;
+    for (let p = 0; p < pages.length; p++) {
+      const page = pages[p];
+      if (page.containsLine(paragraphIndex, lineIndex)) {
+        pageIndex = p;
+        break;
+      }
+    }
+    structurePosition.pageIndex = pageIndex;
+
+    // Finally set the calculated structure position
     this.structurePosition = structurePosition;
   }
 
   public mapPixelCoordinateToStructure(
     x: number,
     y: number,
+    pageIndex: number,
     moveCursor: boolean = true,
   ): StructurePosition | undefined {
     const lineHeight = 20; // Height of each line
     const leftMargin = this.editor.margins.left; // Left margin for the text
     const adjustedX = x - leftMargin; // Adjust x for left margin
-    const lineIndex = Math.floor((y - this.editor.margins.top) / lineHeight);
+    const clickedLineInPage = Math.floor((y - this.editor.margins.top) / lineHeight);
+
+    const page = this.textParser.getPages()[pageIndex];
+    if (!page) return undefined;
 
     const paragraphs = this.textParser.getParagraphs();
+    const { startParagraphIndex, endParagraphIndex, startLineIndex, endLineIndex } = page;
 
-    let accumulatedLines = 0;
-    for (let pIndex = 0; pIndex < paragraphs.length; pIndex++) {
+    // Count lines in the page to find which paragraph and line was clicked
+    let accumulatedLinesInPage = 0;
+
+    for (let pIndex = startParagraphIndex; pIndex <= endParagraphIndex; pIndex++) {
       const paragraph = paragraphs[pIndex];
-      if (lineIndex < accumulatedLines + paragraph.lines.length) {
-        const lineInParagraph = lineIndex - accumulatedLines;
+      if (!paragraph) continue;
+
+      // Determine which lines of this paragraph are in this page
+      let firstLineInPage = 0;
+      let lastLineInPage = paragraph.lines.length - 1;
+
+      if (pIndex === startParagraphIndex) {
+        firstLineInPage = startLineIndex;
+      }
+      if (pIndex === endParagraphIndex) {
+        lastLineInPage = endLineIndex;
+      }
+
+      const linesInPageForThisParagraph = lastLineInPage - firstLineInPage + 1;
+
+      // Check if the clicked line is within this paragraph's lines in the page
+      if (clickedLineInPage < accumulatedLinesInPage + linesInPageForThisParagraph) {
+        const lineInParagraph = firstLineInPage + (clickedLineInPage - accumulatedLinesInPage);
         const line = paragraph.lines[lineInParagraph];
+
+        if (!line) return undefined;
+
         // Now find the character index in the line based on adjustedX
         let charIndex = 0;
         let currentWidth = 0;
@@ -200,7 +243,9 @@ export class CursorManager {
           currentWidth += charWidth;
           charIndex++;
         }
+
         const proposed: StructurePosition = {
+          pageIndex: pageIndex,
           paragraphIndex: pIndex,
           lineIndex: lineInParagraph,
           characterIndex: charIndex,
@@ -210,6 +255,7 @@ export class CursorManager {
         if (moveCursor) {
           this.structurePosition = proposed;
           this.linearPosition = this.mapStructureToLinear({
+            pageIndex: pageIndex,
             paragraphIndex: pIndex,
             lineIndex: lineInParagraph,
             characterIndex: charIndex,
@@ -217,7 +263,8 @@ export class CursorManager {
         }
         return proposed;
       }
-      accumulatedLines += paragraph.lines.length;
+
+      accumulatedLinesInPage += linesInPageForThisParagraph;
     }
     return undefined;
   }
@@ -244,7 +291,7 @@ export class CursorManager {
     const { paragraphIndex, lineIndex, pixelOffsetInLine } = this.structurePosition;
 
     if (paragraphIndex === -1 || lineIndex === -1 || pixelOffsetInLine === -1) {
-      console.log(
+      this.editor.logger.cursorOperations(
         'getLineAdjacentCursorPosition - Invalid cursor position structure:',
         this.structurePosition,
       );
@@ -293,6 +340,7 @@ export class CursorManager {
       const newPos = targetParagraph.offset + line.offset;
       if (moveCursor) {
         this.structurePosition = {
+          pageIndex: this.structurePosition.pageIndex, // Preserve current page
           paragraphIndex: targetParagraphIndex,
           lineIndex: targetLine,
           characterIndex: 0,
@@ -352,7 +400,19 @@ export class CursorManager {
 
     const newPos = targetParagraph.offset + targetParagraph.lines[targetLine].offset + charIndex;
     if (moveCursor) {
+      // Calculate the page index for the new position
+      const pages = this.textParser.getPages();
+      let newPageIndex = this.structurePosition.pageIndex; // Default to current page
+      for (let p = 0; p < pages.length; p++) {
+        const page = pages[p];
+        if (page.containsLine(targetParagraphIndex, targetLine)) {
+          newPageIndex = p;
+          break;
+        }
+      }
+
       this.structurePosition = {
+        pageIndex: newPageIndex,
         paragraphIndex: targetParagraphIndex,
         lineIndex: targetLine,
         characterIndex: charIndex,

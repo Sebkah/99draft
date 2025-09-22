@@ -2,8 +2,9 @@ import { Editor } from '@renderer/Editor/Editor';
 
 import Ruler from './Ruler';
 
-import React, { useEffect, useRef, useState, useLayoutEffect } from 'react';
+import React, { useEffect, useRef, useState, useLayoutEffect, use } from 'react';
 import { baseText } from '@renderer/assets/baseText';
+import DebugPanelNew from './DebugPanelNew';
 
 const editorWidth = 800;
 const editorHeight = (editorWidth / 21) * 29.7; // A4 aspect ratio
@@ -34,9 +35,12 @@ const TextEditor = () => {
    */
   const updatePageCount = () => {
     const newPageCount = editor.numberOfPages;
-    console.log('Updating page count from', numberOfPages, 'to', newPageCount);
     setNumberOfPages(newPageCount);
   };
+
+  useEffect(() => {
+    console.log('PageCount changed');
+  }, [numberOfPages]);
 
   /**
    * Initialize canvas context and editor
@@ -45,7 +49,6 @@ const TextEditor = () => {
   useEffect(() => {
     // Set up page count change callback
     editor.setPageCountChangeCallback((newPageCount) => {
-      console.log('Page count changed via callback:', newPageCount);
       setNumberOfPages(newPageCount);
     });
 
@@ -69,9 +72,10 @@ const TextEditor = () => {
      */
     const handleKeyDown = (event: KeyboardEvent) => {
       if (!editor) return;
+
       // Forward the native event to the editor's handler
-      const handled = editor.handleKeyDown(event);
-      if (handled) {
+      const consumed = editor.handleKeyDown(event);
+      if (consumed) {
         event.preventDefault();
       }
     };
@@ -115,7 +119,7 @@ const TextEditor = () => {
       </div>
 
       {/* Debug panel positioned at bottom right */}
-      {/*  {editor && <DebugPanelNew editor={editor} />} */}
+      {editor && <DebugPanelNew editor={editor} />}
     </>
   );
 };

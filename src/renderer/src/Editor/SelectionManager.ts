@@ -27,7 +27,12 @@ export class SelectionManager {
     this.isSelecting = true;
 
     // Move cursor to the starting position
-    this.cursorManager.mapPixelCoordinateToStructure(mousePosition.x, mousePosition.y, true);
+    this.cursorManager.mapPixelCoordinateToStructure(
+      mousePosition.x,
+      mousePosition.y,
+      mousePosition.page,
+      true,
+    );
   }
 
   /**
@@ -40,6 +45,7 @@ export class SelectionManager {
     const endPointInStructure = this.cursorManager.mapPixelCoordinateToStructure(
       mousePosition.x,
       mousePosition.y,
+      mousePosition.page,
       false,
     );
 
@@ -67,6 +73,7 @@ export class SelectionManager {
     const endPointInStructure = this.cursorManager.mapPixelCoordinateToStructure(
       mousePosition.x,
       mousePosition.y,
+      mousePosition.page,
       false,
     );
 

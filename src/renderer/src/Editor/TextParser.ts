@@ -87,11 +87,15 @@ export class TextParser {
 
       // Skip empty paragraphs (paragraphs with no lines)
       if (paragraph.lines.length === 0) {
-        console.log(`Skipping empty paragraph ${pIndex} with ${paragraph.lines.length} lines`);
+        this.editor.logger.pageManagement(
+          `Skipping empty paragraph ${pIndex} with ${paragraph.lines.length} lines`,
+        );
         continue;
       }
 
-      console.log(`Processing paragraph ${pIndex} with ${paragraph.lines.length} lines`);
+      this.editor.logger.pageManagement(
+        `Processing paragraph ${pIndex} with ${paragraph.lines.length} lines`,
+      );
 
       let remainingLinesInParagraph = paragraph.lines.length;
 
@@ -107,7 +111,7 @@ export class TextParser {
           // If there's no current page, start a new one with this paragraph
           if (!currentPage) {
             const endLineIndex = currentLineIndexInParagraph + remainingLinesInParagraph - 1;
-            console.log(
+            this.editor.logger.pageManagement(
               `Creating new page: P${pIndex}:L${currentLineIndexInParagraph} -> P${pIndex}:L${endLineIndex}`,
             );
             currentPage = new Page(pIndex, pIndex, currentLineIndexInParagraph, endLineIndex);
@@ -116,7 +120,7 @@ export class TextParser {
           // Extend the current page to include this paragraph
           else {
             const endLineIndex = currentLineIndexInParagraph + remainingLinesInParagraph - 1;
-            console.log(`Extending page to: P${pIndex}:L${endLineIndex}`);
+            this.editor.logger.pageManagement(`Extending page to: P${pIndex}:L${endLineIndex}`);
             currentPage.extendTo(pIndex, endLineIndex);
           }
 
@@ -154,9 +158,9 @@ export class TextParser {
 
     // Store the computed pages
     this.pages = pages;
-    console.log('Page splitting completed. Created', pages.length, 'pages:');
+    this.editor.logger.pageManagement('Page splitting completed. Created', pages.length, 'pages:');
     pages.forEach((page, index) => {
-      console.log(`Page ${index}:`, page.toString());
+      this.editor.logger.pageManagement(`Page ${index}:`, page.toString());
     });
   }
 
