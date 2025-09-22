@@ -6,16 +6,16 @@ import { CursorManager, MousePosition } from './CursorManager';
  * Handles mouse-based selection, selection boundaries, and selection queries
  */
 export class SelectionManager {
-  private _editor: Editor;
-  private _cursorManager: CursorManager;
+  private editor: Editor;
+  private cursorManager: CursorManager;
 
   // Selection state
   public selection: { start: number; end: number } | null = null;
   private isSelecting: boolean = false;
 
   constructor(editor: Editor, cursorManager: CursorManager) {
-    this._editor = editor;
-    this._cursorManager = cursorManager;
+    this.editor = editor;
+    this.cursorManager = cursorManager;
   }
 
   /**
@@ -27,7 +27,7 @@ export class SelectionManager {
     this.isSelecting = true;
 
     // Move cursor to the starting position
-    this._cursorManager.mapPixelCoordinateToStructure(mousePosition.x, mousePosition.y, true);
+    this.cursorManager.mapPixelCoordinateToStructure(mousePosition.x, mousePosition.y, true);
   }
 
   /**
@@ -37,7 +37,7 @@ export class SelectionManager {
   updateSelection(mousePosition: MousePosition): void {
     if (!this.isSelecting) return;
 
-    const endPointInStructure = this._cursorManager.mapPixelCoordinateToStructure(
+    const endPointInStructure = this.cursorManager.mapPixelCoordinateToStructure(
       mousePosition.x,
       mousePosition.y,
       false,
@@ -47,8 +47,8 @@ export class SelectionManager {
       return;
     }
 
-    const endPointCursorPos = this._cursorManager.mapStructureToLinear(endPointInStructure);
-    const currentCursorPos = this._cursorManager.getPosition();
+    const endPointCursorPos = this.cursorManager.mapStructureToLinear(endPointInStructure);
+    const currentCursorPos = this.cursorManager.getPosition();
 
     this.selection = {
       start: Math.min(currentCursorPos, endPointCursorPos),
@@ -64,7 +64,7 @@ export class SelectionManager {
     if (!this.isSelecting) return;
 
     this.isSelecting = false;
-    const endPointInStructure = this._cursorManager.mapPixelCoordinateToStructure(
+    const endPointInStructure = this.cursorManager.mapPixelCoordinateToStructure(
       mousePosition.x,
       mousePosition.y,
       false,
@@ -74,8 +74,8 @@ export class SelectionManager {
       return;
     }
 
-    const endPointCursorPos = this._cursorManager.mapStructureToLinear(endPointInStructure);
-    const currentCursorPos = this._cursorManager.getPosition();
+    const endPointCursorPos = this.cursorManager.mapStructureToLinear(endPointInStructure);
+    const currentCursorPos = this.cursorManager.getPosition();
 
     // Only set selection if there's an actual range, else clear the selection
     if (currentCursorPos !== endPointCursorPos) {
@@ -121,7 +121,7 @@ export class SelectionManager {
       return '';
     }
 
-    return this._editor
+    return this.editor
       .getPieceTable()
       .getRangeText(this.selection.start, this.selection.end - this.selection.start);
   }
@@ -133,7 +133,7 @@ export class SelectionManager {
    */
   handleMoveLeftWithSelection(): boolean {
     if (this.selection) {
-      this._cursorManager.setCursorPosition(this.selection.start);
+      this.cursorManager.setCursorPosition(this.selection.start);
       this.clearSelection();
       return true;
     }
@@ -147,7 +147,7 @@ export class SelectionManager {
    */
   handleMoveRightWithSelection(): boolean {
     if (this.selection) {
-      this._cursorManager.setCursorPosition(this.selection.end);
+      this.cursorManager.setCursorPosition(this.selection.end);
       this.clearSelection();
       return true;
     }
@@ -158,7 +158,7 @@ export class SelectionManager {
    * Selects all text in the document
    */
   selectAll(): void {
-    const textLength = this._editor.getPieceTable().length;
+    const textLength = this.editor.getPieceTable().length;
     if (textLength > 0) {
       this.selection = {
         start: 0,
@@ -179,8 +179,8 @@ export class SelectionManager {
     const start = this.selection.start;
     const length = this.selection.end - this.selection.start;
 
-    this._editor.getPieceTable().delete(start, length);
-    this._cursorManager.setCursorPosition(start);
+    this.editor.getPieceTable().delete(start, length);
+    this.cursorManager.setCursorPosition(start);
     this.clearSelection();
 
     return { start, length };

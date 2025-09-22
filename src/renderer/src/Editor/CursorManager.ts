@@ -18,7 +18,7 @@ export type MousePosition = {
 
 export class CursorManager {
   // Manages cursor position and movement within the editor
-  private _textParser: TextParser;
+  private textParser: TextParser;
   private linearPosition: number;
   public structurePosition: StructurePosition = {
     paragraphIndex: -1,
@@ -26,8 +26,8 @@ export class CursorManager {
     characterIndex: -1,
     pixelOffsetInLine: -1,
   };
-  private _editor: Editor;
-  private _selectionManager?: SelectionManager;
+  private editor: Editor;
+  private selectionManager?: SelectionManager;
 
   private measureText: (text: string) => TextMetrics;
 
@@ -38,14 +38,14 @@ export class CursorManager {
     editor: Editor,
   ) {
     this.linearPosition = initialPosition;
-    this._textParser = textParser;
-    this._editor = editor;
+    this.textParser = textParser;
+    this.editor = editor;
     this.measureText = ctx.measureText.bind(ctx);
     this.mapLinearToStructure();
   }
 
   public setSelectionManager(selectionManager: any): void {
-    this._selectionManager = selectionManager;
+    this.selectionManager = selectionManager;
   }
 
   public getPosition(): number {
@@ -53,20 +53,20 @@ export class CursorManager {
   }
 
   public setCursorPosition(position: number): void {
-    position = Math.max(0, Math.min(position, this._editor.getPieceTable().length)); //ugly, find a solution
+    position = Math.max(0, Math.min(position, this.editor.getPieceTable().length)); //ugly, find a solution
 
     this.linearPosition = position;
     this.mapLinearToStructure();
 
     // Clear selection when cursor moves
-    if (this._selectionManager) {
-      (this._selectionManager as any).clearSelection();
+    if (this.selectionManager) {
+      (this.selectionManager as any).clearSelection();
     }
   }
 
   public moveLeft(amount: number): void {
     // Handle selection if there's one
-    if (this._selectionManager && (this._selectionManager as any).handleMoveLeftWithSelection()) {
+    if (this.selectionManager && (this.selectionManager as any).handleMoveLeftWithSelection()) {
       return;
     }
 
@@ -75,7 +75,7 @@ export class CursorManager {
 
   public moveRight(amount: number): void {
     // Handle selection if there's one
-    if (this._selectionManager && (this._selectionManager as any).handleMoveRightWithSelection()) {
+    if (this.selectionManager && (this.selectionManager as any).handleMoveRightWithSelection()) {
       return;
     }
 
@@ -94,7 +94,7 @@ export class CursorManager {
   // - provide hints not to search the whole range (if left or right, up or down, the cursor is probably in a line adjacent or in the same line, if left it necessarily before, etc....)
   public mapLinearToStructure(): void {
     const cursorPosition = this.linearPosition;
-    const paragraphs = this._textParser.getParagraphs();
+    const paragraphs = this.textParser.getParagraphs();
     let structurePosition: StructurePosition = {
       paragraphIndex: -1,
       lineIndex: -1,
@@ -175,11 +175,11 @@ export class CursorManager {
     moveCursor: boolean = true,
   ): StructurePosition | undefined {
     const lineHeight = 20; // Height of each line
-    const leftMargin = this._editor.margins.left; // Left margin for the text
+    const leftMargin = this.editor.margins.left; // Left margin for the text
     const adjustedX = x - leftMargin; // Adjust x for left margin
-    const lineIndex = Math.floor((y - this._editor.margins.top) / lineHeight);
+    const lineIndex = Math.floor((y - this.editor.margins.top) / lineHeight);
 
-    const paragraphs = this._textParser.getParagraphs();
+    const paragraphs = this.textParser.getParagraphs();
 
     let accumulatedLines = 0;
     for (let pIndex = 0; pIndex < paragraphs.length; pIndex++) {
@@ -222,7 +222,7 @@ export class CursorManager {
   }
 
   public mapStructureToLinear(structurePos: Omit<StructurePosition, 'pixelOffsetInLine'>): number {
-    const paragraphs = this._textParser.getParagraphs();
+    const paragraphs = this.textParser.getParagraphs();
     const { paragraphIndex, lineIndex, characterIndex } = structurePos;
     const targetParagraph = paragraphs[paragraphIndex];
     if (!targetParagraph) return this.linearPosition; // Invalid paragraph index
@@ -237,7 +237,7 @@ export class CursorManager {
     direction: 'above' | 'below',
     moveCursor: boolean = true,
   ): number {
-    const paragraphs = this._textParser.getParagraphs();
+    const paragraphs = this.textParser.getParagraphs();
 
     // Get current cursor position mapping
     const { paragraphIndex, lineIndex, pixelOffsetInLine } = this.structurePosition;

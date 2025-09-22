@@ -4,66 +4,66 @@ import { Line } from './TextParser';
  * Represents a paragraph of text with associated metadata and methods for manipulation.
  */
 export class Paragraph {
-  private _text: string;
-  private _offset: number;
-  private _length: number;
-  private _lines: Line[] = [];
+  private paragraphText: string;
+  private paragraphOffset: number;
+  private paragraphLength: number;
+  private paragraphLines: Line[] = [];
 
   constructor(text: string, offset: number) {
-    this._text = text;
-    this._offset = offset;
-    this._length = text.length;
+    this.paragraphText = text;
+    this.paragraphOffset = offset;
+    this.paragraphLength = text.length;
   }
 
   // Getters
   get text(): string {
-    return this._text;
+    return this.paragraphText;
   }
 
   get offset(): number {
-    return this._offset;
+    return this.paragraphOffset;
   }
 
   get length(): number {
-    return this._length;
+    return this.paragraphLength;
   }
 
   get lines(): Line[] {
-    return this._lines;
+    return this.paragraphLines;
   }
 
   // Utility methods
   public updateText(newText: string): void {
-    this._text = newText;
-    this._length = newText.length;
+    this.paragraphText = newText;
+    this.paragraphLength = newText.length;
   }
 
   public updateLength(delta: number): void {
-    this._length += delta;
+    this.paragraphLength += delta;
   }
 
   public shiftOffset(delta: number): void {
-    this._offset += delta;
+    this.paragraphOffset += delta;
   }
 
   public setLines(lines: Line[]): void {
-    this._lines = lines;
+    this.paragraphLines = lines;
   }
 
   public appendText(text: string): void {
-    this._text += text;
-    this._length = this._text.length;
+    this.paragraphText += text;
+    this.paragraphLength = this.paragraphText.length;
   }
 
   public isEmpty(): boolean {
-    return this._length === 0;
+    return this.paragraphLength === 0;
   }
 
   public getEndOffset(): number {
-    return this._offset + this._length;
+    return this.paragraphOffset + this.paragraphLength;
   }
 
   public containsPosition(position: number): boolean {
-    return position >= this._offset && position < this.getEndOffset() + 1;
+    return position >= this.paragraphOffset && position < this.getEndOffset() + 1;
   }
 }

@@ -4,41 +4,41 @@ import { TextParser } from './TextParser';
 export class TextRenderer {
   private ctx: CanvasRenderingContext2D;
 
-  private _textParser: TextParser;
-  private _editor: Editor;
+  private textParser: TextParser;
+  private editor: Editor;
 
-  private _showDebugInfo: boolean = true;
+  private debugInfoEnabled: boolean = true;
 
   private justifyText: boolean = false;
 
-  private _hoveredParagraphIndex: number | null = null;
-  private _hoveredLine: { p: number; l: number } | null = null;
+  private hoveredParagraphIndex: number | null = null;
+  private hoveredLine: { p: number; l: number } | null = null;
 
   public setHoveredParagraph(index: number | null): void {
-    this._hoveredParagraphIndex = index;
+    this.hoveredParagraphIndex = index;
   }
 
   public setHoveredLine(pindex: number | null, lindex?: number | null): void {
     if (pindex === null || lindex === null || lindex === undefined) {
-      this._hoveredLine = null;
+      this.hoveredLine = null;
       return;
     }
-    this._hoveredLine = { p: pindex, l: lindex };
+    this.hoveredLine = { p: pindex, l: lindex };
   }
 
   // Getter and setter for debug info
   public get showDebugInfo(): boolean {
-    return this._showDebugInfo;
+    return this.debugInfoEnabled;
   }
 
   public set showDebugInfo(show: boolean) {
-    this._showDebugInfo = show;
+    this.debugInfoEnabled = show;
   }
 
   constructor(ctx: CanvasRenderingContext2D, textParser: TextParser, editor: Editor) {
     this.ctx = ctx;
-    this._textParser = textParser;
-    this._editor = editor;
+    this.textParser = textParser;
+    this.editor = editor;
 
     this.ctx.font = '16px Arial';
   }
@@ -66,15 +66,15 @@ export class TextRenderer {
     this.ctx.fillStyle = 'blue';
     this.ctx.font = '12px Arial';
 
-    const paragraphs = this._textParser.getParagraphs();
-    const position = this.ctx.canvas.width - this._editor.margins.right;
+    const paragraphs = this.textParser.getParagraphs();
+    const position = this.ctx.canvas.width - this.editor.margins.right;
 
-    this.ctx.translate(0, lineHeight + this._editor.margins.top); // Start below top margin
+    this.ctx.translate(0, lineHeight + this.editor.margins.top); // Start below top margin
     paragraphs.forEach((paragraph, pindex) => {
       // Highlight hovered paragraph area (always, regardless of debug text toggle)
-      if (this._hoveredParagraphIndex === pindex) {
-        const left = this._editor.margins.left - 2;
-        const width = this._editor.wrappingWidth + 4;
+      if (this.hoveredParagraphIndex === pindex) {
+        const left = this.editor.margins.left - 2;
+        const width = this.editor.wrappingWidth + 4;
         const height = paragraph.lines.length * lineHeight;
         const top = -lineHeight;
         this.ctx.save();
@@ -84,7 +84,7 @@ export class TextRenderer {
         this.ctx.restore();
       }
       // Render paragraph debug info
-      if (this._showDebugInfo && this._editor.debugConfig.showParagraphBounds) {
+      if (this.showDebugInfo && this.editor.debugConfig.showParagraphBounds) {
         const padding = 5;
 
         const paragraphHeight = paragraph.lines.length * lineHeight;
@@ -117,9 +117,9 @@ export class TextRenderer {
 
       paragraph.lines.forEach((line, lindex) => {
         // Highlight hovered line (always)
-        if (this._hoveredLine && this._hoveredLine.p === pindex && this._hoveredLine.l === lindex) {
-          const left = this._editor.margins.left - 2;
-          const width = Math.max(0, Math.min(this._editor.wrappingWidth, line.pixelLength + 4));
+        if (this.hoveredLine && this.hoveredLine.p === pindex && this.hoveredLine.l === lindex) {
+          const left = this.editor.margins.left - 2;
+          const width = Math.max(0, Math.min(this.editor.wrappingWidth, line.pixelLength + 4));
           const top = -lineHeight + 1;
           const height = lineHeight - 2;
           this.ctx.save();
@@ -129,18 +129,18 @@ export class TextRenderer {
           this.ctx.restore();
         }
         // Render line debug info
-        if (this._showDebugInfo && this._editor.debugConfig.showLineInfo) {
+        if (this.showDebugInfo && this.editor.debugConfig.showLineInfo) {
           this.ctx.fillStyle = 'blue';
           this.ctx.fillText(`offset ${line.offset}`, 10, 0);
           this.ctx.fillText(`length ${line.length}`, 80, 0);
         }
 
-        if (this._showDebugInfo && this._editor.debugConfig.showWordOffsets) {
+        if (this.showDebugInfo && this.editor.debugConfig.showWordOffsets) {
           line.wordpixelOffsets.forEach((wordOffset, windex) => {
             // Render word pixel offsets as small vertical lines
             this.ctx.fillStyle = 'red';
             this.ctx.fillRect(
-              wordOffset + this._editor.margins.left - 1,
+              wordOffset + this.editor.margins.left - 1,
               -lineHeight,
               2,
               lineHeight,
@@ -151,7 +151,7 @@ export class TextRenderer {
 
             // Display different info based on mode
             let displayText = '';
-            switch (this._editor.debugConfig.wordDisplayMode) {
+            switch (this.editor.debugConfig.wordDisplayMode) {
               case 'index':
                 displayText = `${windex}`;
                 break;
@@ -163,7 +163,7 @@ export class TextRenderer {
                 break;
             }
 
-            this.ctx.fillText(displayText, wordOffset + this._editor.margins.left - 2, topOrBottom);
+            this.ctx.fillText(displayText, wordOffset + this.editor.margins.left - 2, topOrBottom);
           });
         }
         this.ctx.translate(0, lineHeight);
@@ -175,23 +175,23 @@ export class TextRenderer {
   }
 
   public render(): void {
-    const leftMargin = this._editor.margins.left; // Left margin for the text
-    const structurePosition = this._editor.cursorManager.structurePosition;
+    const leftMargin = this.editor.margins.left; // Left margin for the text
+    const structurePosition = this.editor.cursorManager.structurePosition;
     const lineHeight = 20; // Height of each line
     this.ctx.clearRect(0, 0, this.ctx.canvas.width, this.ctx.canvas.height);
 
     this.ctx.save();
 
-    this.ctx.translate(0, this._editor.margins.top); // Top margin
+    this.ctx.translate(0, this.editor.margins.top); // Top margin
 
     // Set base text style for all text rendering
     this.setBaseTextStyle();
 
-    const paragraphs = this._textParser.getParagraphs();
+    const paragraphs = this.textParser.getParagraphs();
 
     // Draw selection highlight if present
-    if (this._editor.selectionManager.hasSelection()) {
-      const sel = this._editor.selectionManager.getSelection()!;
+    if (this.editor.selectionManager.hasSelection()) {
+      const sel = this.editor.selectionManager.getSelection()!;
       const start = sel.start;
       const end = sel.end;
       this.ctx.save();
@@ -231,15 +231,15 @@ export class TextRenderer {
         if (
           structurePosition.paragraphIndex === pindex &&
           structurePosition.lineIndex === lindex &&
-          !this._editor.selectionManager.hasSelection()
+          !this.editor.selectionManager.hasSelection()
         ) {
-          if (this._editor.debugConfig.showCursor) {
+          if (this.editor.debugConfig.showCursor) {
             this.ctx.fillRect(structurePosition.pixelOffsetInLine + leftMargin, 0, 2, lineHeight);
           }
         }
 
         if (this.justifyText) {
-          const lineLenghtRest = this._editor.wrappingWidth - line.pixelLength;
+          const lineLenghtRest = this.editor.wrappingWidth - line.pixelLength;
           const spaceCount = (line.text.match(/ /g) || []).length;
           const distributeSpace = spaceCount > 0 ? lineLenghtRest / spaceCount : 0;
 

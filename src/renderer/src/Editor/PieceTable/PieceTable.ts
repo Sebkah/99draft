@@ -16,15 +16,13 @@ export class PieceTable {
 
   /**
    * Holds the initial, immutable text content of the file.
-   * @private
    */
-  public readonly originalBuffer: string;
+  private readonly originalBuffer: string;
 
   /**
    * A buffer that stores all newly inserted text. It is append-only.
-   * @private
    */
-  public addBuffer: string;
+  private addBuffer: string;
 
   /**
    * The ordered list of pieces that represents the current state of the document.
@@ -35,18 +33,16 @@ export class PieceTable {
 
   /**
    * A cached value of the total length of the document for performance.
-   * @private
    */
-  private _length: number;
+  private documentLength: number;
 
-  private _addBufferLength: number = 0;
+  private addBufferLength: number = 0;
 
   /**
    * Version counter that increments with each modification.
    * Used to track when the text has changed for optimizing parsing.
-   * @private
    */
-  private _version: number = 0;
+  private version: number = 0;
 
   // CONSTRUCTOR
 
@@ -58,7 +54,7 @@ export class PieceTable {
     this.originalBuffer = originalContent;
     this.addBuffer = '';
 
-    this._length = originalContent.length;
+    this.documentLength = originalContent.length;
 
     // The initial state is a single piece spanning the entire original buffer.
     if (originalContent.length > 0) {
@@ -80,7 +76,7 @@ export class PieceTable {
    * Gets the total length of the document.
    */
   public get length(): number {
-    return this._length;
+    return this.documentLength;
   }
 
   /**
@@ -88,7 +84,21 @@ export class PieceTable {
    * Increments with each modification (insert/delete).
    */
   public getVersion(): number {
-    return this._version;
+    return this.version;
+  }
+
+  /**
+   * Gets the original buffer content (read-only access).
+   */
+  public getOriginalBuffer(): string {
+    return this.originalBuffer;
+  }
+
+  /**
+   * Gets the add buffer content (read-only access).
+   */
+  public getAddBuffer(): string {
+    return this.addBuffer;
   }
 
   /**
@@ -106,8 +116,14 @@ export class PieceTable {
   }
 
   public getRangeText(start: number, length: number): string {
-    const end = Math.min(start + length, this._length);
-    if (start < 0 || length <= 0 || start >= this._length || start >= end || end > this._length) {
+    const end = Math.min(start + length, this.documentLength);
+    if (
+      start < 0 ||
+      length <= 0 ||
+      start >= this.documentLength ||
+      start >= end ||
+      end > this.documentLength
+    ) {
       console.warn('getRangeText: invalid range');
       return '';
     }
@@ -176,8 +192,8 @@ export class PieceTable {
    * @private
    */
   private updateLength(count: number): void {
-    this._length += count;
-    this._addBufferLength += count;
+    this.documentLength += count;
+    this.addBufferLength += count;
   }
 
   /**
@@ -187,7 +203,7 @@ export class PieceTable {
    */
   public insert(text: string, position: number): void {
     if (text.length === 0) return;
-    if (position < 0 || position > this._length) {
+    if (position < 0 || position > this.documentLength) {
       throw new Error('Insert position out of bounds');
     }
 
@@ -195,16 +211,16 @@ export class PieceTable {
 
     // 1. Append the new text to the 'add' buffer and create a piece for it.
     this.addBuffer += text;
-    const newTextOffset = this._addBufferLength;
+    const newTextOffset = this.addBufferLength;
 
-    const cursorAtEnd = position === this._length;
+    const cursorAtEnd = position === this.documentLength;
 
     // If inserting at the end, append new add-buffer piece and merge inline
     if (cursorAtEnd) {
       const newPiece: Piece = { source: 'add', offset: newTextOffset, length: textLength };
       this.pieces.push(newPiece);
       this.updateLength(textLength);
-      this._version++;
+      this.version++;
       // Inline merge with previous if contiguous
       const last = this.pieces.length - 1;
       if (last > 0) {
@@ -239,7 +255,7 @@ export class PieceTable {
     ) {
       oldPiece.length += textLength;
       this.updateLength(textLength);
-      this._version++;
+      this.version++;
       return;
     }
 
@@ -273,7 +289,7 @@ export class PieceTable {
 
     // 5. Update length and version
     this.updateLength(textLength);
-    this._version++;
+    this.version++;
 
     // 6. Inline merge around the new piece
     const insertionIndex = pieceIndex + (before ? 1 : 0);
@@ -332,11 +348,11 @@ export class PieceTable {
     if (start < 0) {
       throw new Error('Delete: start position cannot be negative');
     }
-    if (start >= this._length) {
+    if (start >= this.documentLength) {
       throw new Error('Delete: start position out of bounds');
     }
-    if (start + deleteCount > this._length) {
-      deleteCount = this._length - start; // Clamp to document length
+    if (start + deleteCount > this.documentLength) {
+      deleteCount = this.documentLength - start; // Clamp to document length
     }
 
     // 1. Find the starting piece and ending piece for the deletion range.
@@ -380,8 +396,8 @@ export class PieceTable {
       // Replace the range of pieces with the new kept pieces
       this.pieces.splice(startIdx, endIdx - startIdx + 1, ...newPieces);
       // Update document length
-      this._length -= deleteCount;
-      this._version++;
+      this.documentLength -= deleteCount;
+      this.version++;
       return;
     }
     // No further action needed; multi-piece case handled above
@@ -483,14 +499,14 @@ export class PieceTable {
       throw new Error('truncation: range is invalid');
     }
 
-    this._version++;
+    this.version++;
 
     // 1. KEEP MODE: Keep only the specified range, discard everything else
     if (mode === 'keep') {
       if (start >= end) {
         // Empty range to keep, delete the whole piece
         this.pieces.splice(pieceIndex, 1);
-        this._length -= piece.length;
+        this.documentLength -= piece.length;
         return;
       }
 
@@ -502,7 +518,7 @@ export class PieceTable {
       };
 
       this.pieces[pieceIndex] = newPiece;
-      this._length -= piece.length - newPiece.length; // Update document length
+      this.documentLength -= piece.length - newPiece.length; // Update document length
       return;
     }
 
@@ -512,7 +528,7 @@ export class PieceTable {
     if (start === 0 && end === piece.length) {
       console.log('Deleting entire piece');
       this.pieces.splice(pieceIndex, 1);
-      this._length -= piece.length;
+      this.documentLength -= piece.length;
       return; // Added return to prevent fallthrough
     }
 
@@ -526,7 +542,7 @@ export class PieceTable {
       };
 
       this.pieces[pieceIndex] = secondPart;
-      this._length -= end - start; // Update document length
+      this.documentLength -= end - start; // Update document length
       return;
     }
 
@@ -539,7 +555,7 @@ export class PieceTable {
         source: piece.source,
       };
       this.pieces[pieceIndex] = firstPart;
-      this._length -= end - start; // Update document length
+      this.documentLength -= end - start; // Update document length
       return;
     }
 
@@ -561,7 +577,7 @@ export class PieceTable {
 
     // Replace original piece with the two new pieces
     this.pieces.splice(pieceIndex, 1, beforePiece, afterPiece);
-    this._length -= end - start; // Update document length
+    this.documentLength -= end - start; // Update document length
   }
 
   /**

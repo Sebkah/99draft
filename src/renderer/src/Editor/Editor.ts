@@ -287,15 +287,14 @@ export class Editor {
         if (piece.source === 'original') {
           return {
             ...piece,
-            text: this.pieceTable.originalBuffer.substring(
-              piece.offset,
-              piece.offset + piece.length,
-            ),
+            text: this.pieceTable
+              .getOriginalBuffer()
+              .substring(piece.offset, piece.offset + piece.length),
           };
         }
         return {
           ...piece,
-          text: this.pieceTable.addBuffer.substring(piece.offset, piece.offset + piece.length),
+          text: this.pieceTable.getAddBuffer().substring(piece.offset, piece.offset + piece.length),
         };
       });
       this.debugUpdateCallback(pieces);
