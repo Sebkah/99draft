@@ -57,6 +57,13 @@ export class TextParser {
     return this.paragraphs;
   }
 
+  /**
+   * Get the full text from the piece table
+   */
+  public getFullText(): string {
+    return this.pieceTable.getText();
+  }
+
   public splitParagraphsIntoPages(): void {
     const pages: Page[] = [];
     const maxHeight = this.editor.wrappingHeight;

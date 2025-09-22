@@ -1,15 +1,16 @@
-import { app, shell, BrowserWindow, ipcMain } from 'electron';
+import { app, shell, BrowserWindow, ipcMain, dialog, Menu } from 'electron';
 import { join } from 'path';
 import { electronApp, optimizer, is } from '@electron-toolkit/utils';
 import icon from '../../resources/icon.png?asset';
+import { writeFileSync } from 'fs';
 
-function createWindow(): void {
+function createWindow(): BrowserWindow {
   // Create the browser window.
   const mainWindow = new BrowserWindow({
     width: 900,
     height: 670,
     show: false,
-    autoHideMenuBar: true,
+    autoHideMenuBar: false,
     ...(process.platform === 'linux' ? { icon } : {}),
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
@@ -33,6 +34,77 @@ function createWindow(): void {
   } else {
     mainWindow.loadFile(join(__dirname, '../renderer/index.html'));
   }
+
+  // Set up the application menu
+  createApplicationMenu(mainWindow);
+
+  return mainWindow;
+}
+
+/**
+ * Creates the application menu with PDF export functionality
+ */
+function createApplicationMenu(mainWindow: BrowserWindow): void {
+  const template = [
+    {
+      label: 'File',
+      submenu: [
+        {
+          label: 'Export as PDF...',
+          accelerator: 'CmdOrCtrl+E',
+          click: () => {
+            // Trigger PDF export
+            mainWindow.webContents.send('export-pdf-request');
+          },
+        },
+        {
+          label: 'Export as Word Document...',
+          accelerator: 'CmdOrCtrl+Shift+E',
+          click: () => {
+            // Trigger DOCX export
+            mainWindow.webContents.send('export-docx-request');
+          },
+        },
+        { type: 'separator' },
+        {
+          label: 'Quit',
+          accelerator: process.platform === 'darwin' ? 'Cmd+Q' : 'Ctrl+Q',
+          click: () => {
+            app.quit();
+          },
+        },
+      ],
+    },
+    {
+      label: 'Edit',
+      submenu: [
+        { role: 'undo' },
+        { role: 'redo' },
+        { type: 'separator' },
+        { role: 'cut' },
+        { role: 'copy' },
+        { role: 'paste' },
+        { role: 'selectall' },
+      ],
+    },
+    {
+      label: 'View',
+      submenu: [
+        { role: 'reload' },
+        { role: 'forcereload' },
+        { role: 'toggledevtools' },
+        { type: 'separator' },
+        { role: 'resetzoom' },
+        { role: 'zoomin' },
+        { role: 'zoomout' },
+        { type: 'separator' },
+        { role: 'togglefullscreen' },
+      ],
+    },
+  ];
+
+  const menu = Menu.buildFromTemplate(template as any);
+  Menu.setApplicationMenu(menu);
 }
 
 // This method will be called when Electron has finished
@@ -49,8 +121,8 @@ app.whenReady().then(() => {
     optimizer.watchWindowShortcuts(window);
   });
 
-  // IPC test
-  ipcMain.on('ping', () => console.log('pong'));
+  // IPC handlers
+  setupIpcHandlers();
 
   createWindow();
 
@@ -60,6 +132,101 @@ app.whenReady().then(() => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });
 });
+
+/**
+ * Set up IPC handlers for communication between main and renderer processes
+ */
+function setupIpcHandlers(): void {
+  // Legacy ping handler
+  ipcMain.on('ping', () => console.log('pong'));
+
+  // Handle PDF export request from renderer
+  ipcMain.handle('export-pdf', async (event, htmlContent: string) => {
+    try {
+      const mainWindow = BrowserWindow.fromWebContents(event.sender);
+      if (!mainWindow) {
+        throw new Error('Could not find main window');
+      }
+
+      // Show save dialog
+      const result = await dialog.showSaveDialog(mainWindow, {
+        title: 'Export PDF',
+        defaultPath: 'document.pdf',
+        filters: [{ name: 'PDF Files', extensions: ['pdf'] }],
+      });
+
+      if (result.canceled || !result.filePath) {
+        return { success: false, message: 'Export cancelled' };
+      }
+
+      // Create a new BrowserWindow for PDF generation
+      const pdfWindow = new BrowserWindow({
+        width: 800,
+        height: 1000,
+        show: false, // Keep hidden
+        webPreferences: {
+          nodeIntegration: false,
+          contextIsolation: true,
+        },
+      });
+
+      // Load the HTML content
+      await pdfWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(htmlContent)}`);
+
+      // Generate PDF
+      const pdfBuffer = await pdfWindow.webContents.printToPDF({
+        printBackground: true,
+        pageSize: 'A4',
+        margins: {
+          marginType: 'none',
+        },
+      });
+
+      // Save the PDF file
+      writeFileSync(result.filePath, pdfBuffer);
+
+      // Clean up
+      pdfWindow.close();
+
+      return { success: true, filePath: result.filePath };
+    } catch (error) {
+      console.error('PDF export error:', error);
+      return { success: false, message: error instanceof Error ? error.message : 'Unknown error' };
+    }
+  });
+
+  // Handle DOCX export request from renderer
+  ipcMain.handle('export-docx', async (event, docxBuffer: Uint8Array) => {
+    try {
+      const mainWindow = BrowserWindow.fromWebContents(event.sender);
+      if (!mainWindow) {
+        throw new Error('Could not find main window');
+      }
+
+      // Show save dialog
+      const result = await dialog.showSaveDialog(mainWindow, {
+        title: 'Export Word Document',
+        defaultPath: 'document.docx',
+        filters: [{ name: 'Word Documents', extensions: ['docx'] }],
+      });
+
+      if (result.canceled || !result.filePath) {
+        return { success: false, message: 'Export cancelled' };
+      }
+
+      // Convert Uint8Array to Buffer for file writing
+      const buffer = Buffer.from(docxBuffer);
+
+      // Save the DOCX file
+      writeFileSync(result.filePath, buffer);
+
+      return { success: true, filePath: result.filePath };
+    } catch (error) {
+      console.error('DOCX export error:', error);
+      return { success: false, message: error instanceof Error ? error.message : 'Unknown error' };
+    }
+  });
+}
 
 // Quit when all windows are closed, except on macOS. There, it's common
 // for applications and their menu bar to stay active until the user quits

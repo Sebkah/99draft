@@ -84,6 +84,91 @@ const TextEditor = () => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
+  // Add PDF export listener
+  useEffect(() => {
+    /**
+     * Handle PDF export request from the main process
+     */
+    const handlePdfExport = async () => {
+      if (!editor) {
+        console.error('Editor not available for PDF export');
+        return;
+      }
+
+      try {
+        // Generate HTML content using the editor's PDF export functionality
+        const htmlContent = editor.exportToPdf();
+
+        // Use Electron's IPC to convert HTML to PDF
+        const result = await window.api.exportPdf(htmlContent);
+
+        if (result.success) {
+          console.log('PDF exported successfully to:', result.filePath);
+          // Optionally show a success notification
+        } else {
+          console.error('PDF export failed:', result.message);
+          // Optionally show an error notification
+        }
+      } catch (error) {
+        console.error('PDF export error:', error);
+      }
+    };
+
+    /**
+     * Handle DOCX export request from the main process
+     */
+    const handleDocxExport = async () => {
+      if (!editor) {
+        console.error('Editor not available for DOCX export');
+        return;
+      }
+
+      try {
+        // Import the docx library dynamically to avoid bundling issues
+        const { Packer } = await import('docx');
+
+        // Generate DOCX document using the editor's DOCX export functionality
+        const docxDocument = editor.exportToDocx();
+
+        // Convert the document to a blob (browser-compatible)
+        const blob = await Packer.toBlob(docxDocument);
+
+        // Convert blob to array buffer, then to buffer for IPC
+        const arrayBuffer = await blob.arrayBuffer();
+        const buffer = new Uint8Array(arrayBuffer);
+
+        // Use Electron's IPC to save the DOCX file
+        const result = await window.api.exportDocx(buffer);
+
+        if (result.success) {
+          console.log('DOCX exported successfully to:', result.filePath);
+          // Optionally show a success notification
+        } else {
+          console.error('DOCX export failed:', result.message);
+          // Optionally show an error notification
+        }
+      } catch (error) {
+        console.error('DOCX export error:', error);
+      }
+    };
+
+    // Listen for export requests from the main process
+    const removePdfListener = window.electron.ipcRenderer.on('export-pdf-request', handlePdfExport);
+    const removeDocxListener = window.electron.ipcRenderer.on(
+      'export-docx-request',
+      handleDocxExport,
+    );
+
+    return () => {
+      if (removePdfListener) {
+        removePdfListener();
+      }
+      if (removeDocxListener) {
+        removeDocxListener();
+      }
+    };
+  }, [editor]);
+
   /**
    * Handles left margin changes from the ruler
    */

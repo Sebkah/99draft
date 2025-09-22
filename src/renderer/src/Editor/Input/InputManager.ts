@@ -1,24 +1,15 @@
 import { CursorManager } from '../CursorManager';
 import { Editor } from '../Editor';
 
-import { TextRenderer } from '../TextRenderer';
-
 /**
  * InputManager handles all keyboard input for text editing operations
  * Separates input logic from UI rendering concerns
  */
 export class InputManager {
-  private textRenderer: TextRenderer;
   private editor: Editor;
   private cursorManager: CursorManager;
 
-  constructor(
-    textRenderer: TextRenderer,
-
-    cursorManager: CursorManager,
-    editor: Editor,
-  ) {
-    this.textRenderer = textRenderer;
+  constructor(cursorManager: CursorManager, editor: Editor) {
     this.cursorManager = cursorManager;
 
     this.editor = editor;

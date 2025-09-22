@@ -1,5 +1,7 @@
 import { PieceTable } from './PieceTable/PieceTable';
 import { TextRenderer } from './TextRenderer';
+import { PDFRenderer } from './PDFRenderer';
+import { DOCXRenderer } from './DOCXRenderer';
 import { InputManager } from './Input/InputManager';
 import { TextParser } from './TextParser';
 import { CursorManager, MousePosition } from './CursorManager';
@@ -62,6 +64,8 @@ type Margins = {
 export class Editor {
   private pieceTable: PieceTable;
   private textRenderer: TextRenderer;
+  private pdfRenderer: PDFRenderer;
+  private docxRenderer: DOCXRenderer;
   private textParser: TextParser;
   private inputManager: InputManager;
 
@@ -137,6 +141,8 @@ export class Editor {
     // Initialize text renderer and input manager
     this.textParser = new TextParser(this.pieceTable, ctx, this);
     this.textRenderer = new TextRenderer(this.textParser, this);
+    this.pdfRenderer = new PDFRenderer(this.textParser, this);
+    this.docxRenderer = new DOCXRenderer(this.textParser, this);
     this.cursorManager = new CursorManager(
       Math.floor(this.pieceTable.length / 2),
       this.textParser,
@@ -145,7 +151,7 @@ export class Editor {
     );
     this.selectionManager = new SelectionManager(this, this.cursorManager);
     this.cursorManager.setSelectionManager(this.selectionManager);
-    this.inputManager = new InputManager(this.textRenderer, this.cursorManager, this);
+    this.inputManager = new InputManager(this.cursorManager, this);
   }
 
   initialize(): void {
@@ -433,6 +439,30 @@ export class Editor {
       });
       this.debugUpdateCallback(pieces);
     }
+  }
+
+  /**
+   * Export the current document as HTML content ready for PDF conversion
+   * Returns HTML that can be converted to PDF by the application layer
+   */
+  public exportToPdf(): string {
+    return this.pdfRenderer.generateHtmlForPdf();
+  }
+
+  /**
+   * Export the current document as a DOCX Document object
+   * Returns a Document object that can be saved as .docx by the application layer
+   */
+  public exportToDocx(): any {
+    return this.docxRenderer.generateDocxDocument();
+  }
+
+  /**
+   * Export the current document as a simple DOCX Document object
+   * Returns a simplified Document object for basic exports
+   */
+  public exportToSimpleDocx(): any {
+    return this.docxRenderer.generateSimpleDocxDocument();
   }
 
   /**
