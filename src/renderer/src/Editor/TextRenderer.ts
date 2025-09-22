@@ -2,7 +2,7 @@ import { Editor } from './Editor';
 import { TextParser } from './TextParser';
 
 export class TextRenderer {
-  private ctx: CanvasRenderingContext2D;
+  private ctxs: (CanvasRenderingContext2D | null)[] = [];
 
   private textParser: TextParser;
   private editor: Editor;
@@ -35,41 +35,39 @@ export class TextRenderer {
     this.debugInfoEnabled = show;
   }
 
-  constructor(ctx: CanvasRenderingContext2D, textParser: TextParser, editor: Editor) {
-    this.ctx = ctx;
+  constructor(textParser: TextParser, editor: Editor) {
+    /*     this.ctxs = ctxs; */
     this.textParser = textParser;
     this.editor = editor;
-
-    this.ctx.font = '16px Arial';
   }
 
   // Render a single line of text on the canvas
-  private renderLine(text: string, x: number, y: number): void {
-    this.ctx.fillText(text, x, y);
+  private renderLine(ctx: CanvasRenderingContext2D, text: string, x: number, y: number): void {
+    ctx.fillText(text, x, y);
   }
 
   // Set the base text style
-  private setBaseTextStyle(): void {
-    this.ctx.font = '16px Arial';
-    this.ctx.fillStyle = 'black';
+  private setBaseTextStyle(ctx: CanvasRenderingContext2D): void {
+    ctx.font = '16px Arial';
+    ctx.fillStyle = 'black';
   }
 
   // Render debug information for paragraphs, lines, and cursor position
-  private renderDebugInfo(lineHeight: number): void {
+  private renderDebugInfo(ctx: CanvasRenderingContext2D, lineHeight: number): void {
     // Save the current context state to avoid interference with main text rendering
-    this.ctx.save();
+    ctx.save();
 
     // Reset any transformations to render debug info in absolute positions
-    this.ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
 
     // Set debug text style
-    this.ctx.fillStyle = 'blue';
-    this.ctx.font = '12px Arial';
+    ctx.fillStyle = 'blue';
+    ctx.font = '12px Arial';
 
     const paragraphs = this.textParser.getParagraphs();
-    const position = this.ctx.canvas.width - this.editor.margins.right;
+    const position = ctx.canvas.width - this.editor.margins.right;
 
-    this.ctx.translate(0, lineHeight + this.editor.margins.top); // Start below top margin
+    ctx.translate(0, lineHeight + this.editor.margins.top); // Start below top margin
     paragraphs.forEach((paragraph, pindex) => {
       // Highlight hovered paragraph area (always, regardless of debug text toggle)
       if (this.hoveredParagraphIndex === pindex) {
@@ -77,11 +75,11 @@ export class TextRenderer {
         const width = this.editor.wrappingWidth + 4;
         const height = paragraph.lines.length * lineHeight;
         const top = -lineHeight;
-        this.ctx.save();
-        this.ctx.strokeStyle = 'rgba(56, 189, 248, 0.9)';
-        this.ctx.lineWidth = 2;
-        this.ctx.strokeRect(left, top, width, height);
-        this.ctx.restore();
+        ctx.save();
+        ctx.strokeStyle = 'rgba(56, 189, 248, 0.9)';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(left, top, width, height);
+        ctx.restore();
       }
       // Render paragraph debug info
       if (this.showDebugInfo && this.editor.debugConfig.showParagraphBounds) {
@@ -94,25 +92,25 @@ export class TextRenderer {
 
         const paragraphTop = -lineHeight;
 
-        this.ctx.fillStyle = 'blue';
-        this.ctx.fillText(
+        ctx.fillStyle = 'blue';
+        ctx.fillText(
           `P${pindex} - l ${paragraph.length}`,
           position + 10,
           paragraphMidHeight - lineHeight / 2 + padding,
         );
-        this.ctx.fillText(
+        ctx.fillText(
           ` o ${paragraph.offset}`,
           position + 80,
           paragraphMidHeight - lineHeight / 2 + padding,
         );
-        this.ctx.fillText(
+        ctx.fillText(
           ` e ${paragraph.offset + paragraph.length}`,
           position + 170,
           paragraphMidHeight - lineHeight / 2 + padding,
         );
 
-        this.ctx.fillStyle = 'green';
-        this.ctx.fillRect(position, paragraphTop + padding * 2, 4, paragraphHeightWithoutPadding); // Underline for paragraph info
+        ctx.fillStyle = 'green';
+        ctx.fillRect(position, paragraphTop + padding * 2, 4, paragraphHeightWithoutPadding); // Underline for paragraph info
       }
 
       paragraph.lines.forEach((line, lindex) => {
@@ -122,30 +120,25 @@ export class TextRenderer {
           const width = Math.max(0, Math.min(this.editor.wrappingWidth, line.pixelLength + 4));
           const top = -lineHeight + 1;
           const height = lineHeight - 2;
-          this.ctx.save();
-          this.ctx.strokeStyle = 'rgba(16, 185, 129, 0.95)';
-          this.ctx.lineWidth = 2;
-          this.ctx.strokeRect(left, top, width, height);
-          this.ctx.restore();
+          ctx.save();
+          ctx.strokeStyle = 'rgba(16, 185, 129, 0.95)';
+          ctx.lineWidth = 2;
+          ctx.strokeRect(left, top, width, height);
+          ctx.restore();
         }
         // Render line debug info
         if (this.showDebugInfo && this.editor.debugConfig.showLineInfo) {
-          this.ctx.fillStyle = 'blue';
-          this.ctx.fillText(`offset ${line.offset}`, 10, 0);
-          this.ctx.fillText(`length ${line.length}`, 80, 0);
+          ctx.fillStyle = 'blue';
+          ctx.fillText(`offset ${line.offset}`, 10, 0);
+          ctx.fillText(`length ${line.length}`, 80, 0);
         }
 
         if (this.showDebugInfo && this.editor.debugConfig.showWordOffsets) {
           line.wordpixelOffsets.forEach((wordOffset, windex) => {
             // Render word pixel offsets as small vertical lines
-            this.ctx.fillStyle = 'red';
-            this.ctx.fillRect(
-              wordOffset + this.editor.margins.left - 1,
-              -lineHeight,
-              2,
-              lineHeight,
-            );
-            this.ctx.fillStyle = 'green';
+            ctx.fillStyle = 'red';
+            ctx.fillRect(wordOffset + this.editor.margins.left - 1, -lineHeight, 2, lineHeight);
+            ctx.fillStyle = 'green';
             const topOrBottom =
               windex % 2 === 0 ? lineHeight - lineHeight / 2 + 7 : lineHeight - lineHeight / 2;
 
@@ -163,43 +156,91 @@ export class TextRenderer {
                 break;
             }
 
-            this.ctx.fillText(displayText, wordOffset + this.editor.margins.left - 2, topOrBottom);
+            ctx.fillText(displayText, wordOffset + this.editor.margins.left - 2, topOrBottom);
           });
         }
-        this.ctx.translate(0, lineHeight);
+        ctx.translate(0, lineHeight);
       });
     });
 
     // Restore the context state (which will restore the base text style)
-    this.ctx.restore();
+    ctx.restore();
   }
 
-  public render(): void {
+  public updateContexts(ctxs: CanvasRenderingContext2D[]): void {
+    this.ctxs = ctxs;
+  }
+
+  public render(pageIndex: number): void {
+    const ctx = this.ctxs[pageIndex];
+    const pages = this.textParser.getPages();
+    console.log(
+      'Rendering page',
+      pageIndex,
+      'of',
+      pages.length,
+      'total pages. Context available:',
+      !!ctx,
+    );
+
+    if (!ctx) {
+      console.warn(
+        `No context available for page ${pageIndex}. Available contexts:`,
+        this.ctxs.length,
+      );
+      return;
+    }
+
     const leftMargin = this.editor.margins.left; // Left margin for the text
     const structurePosition = this.editor.cursorManager.structurePosition;
     const lineHeight = 20; // Height of each line
-    this.ctx.clearRect(0, 0, this.ctx.canvas.width, this.ctx.canvas.height);
+    ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
 
-    this.ctx.save();
+    ctx.save();
 
-    this.ctx.translate(0, this.editor.margins.top); // Top margin
+    ctx.translate(0, this.editor.margins.top); // Top margin
 
     // Set base text style for all text rendering
-    this.setBaseTextStyle();
+    this.setBaseTextStyle(ctx);
 
-    const paragraphs = this.textParser.getParagraphs();
+    const page = pages[pageIndex];
+    if (!page) {
+      console.warn(`No page data available for page ${pageIndex}`);
+      return;
+    }
+
+    console.log(`Page ${pageIndex} data:`, {
+      startParagraphIndex: page.startParagraphIndex,
+      endParagraphIndex: page.endParagraphIndex,
+      startLineIndex: page.startLineIndex,
+      endLineIndex: page.endLineIndex,
+    });
+
+    const paragraphs = this.textParser
+      .getParagraphs()
+      .slice(page.startParagraphIndex, page.endParagraphIndex + 1);
+
+    const startLineIndex = page.startLineIndex;
+    const endLineIndex = page.endLineIndex;
 
     // Draw selection highlight if present
     if (this.editor.selectionManager.hasSelection()) {
       const sel = this.editor.selectionManager.getSelection()!;
       const start = sel.start;
       const end = sel.end;
-      this.ctx.save();
-      this.ctx.fillStyle = 'rgba(56, 189, 248, 0.25)';
+      ctx.save();
+      ctx.fillStyle = 'rgba(56, 189, 248, 0.25)';
 
       let yCursor = 0;
       paragraphs.forEach((paragraph) => {
-        paragraph.lines.forEach((line) => {
+        paragraph.lines.forEach((line, index) => {
+          // Only consider lines within the page's line range
+          if (
+            (paragraph === paragraphs[0] && index < startLineIndex) ||
+            (paragraph === paragraphs[paragraphs.length - 1] && index > endLineIndex)
+          ) {
+            return;
+          }
           const lineStart = paragraph.offset + line.offset;
           const lineEnd = lineStart + line.length;
 
@@ -211,22 +252,30 @@ export class TextRenderer {
             const endChar = overlEnd - lineStart;
 
             // measure widths
-            const startWidth = this.ctx.measureText(line.text.substring(0, startChar)).width;
-            const endWidth = this.ctx.measureText(line.text.substring(0, endChar)).width;
+            const startWidth = ctx.measureText(line.text.substring(0, startChar)).width;
+            const endWidth = ctx.measureText(line.text.substring(0, endChar)).width;
             const rectX = leftMargin + startWidth;
             const rectW = Math.max(1, endWidth - startWidth);
             // yCursor currently at baseline for this line after translate below, so compute pre-translate
             // We'll draw before translating, tracking yCursor manually
-            this.ctx.fillRect(rectX, yCursor, rectW, lineHeight);
+            ctx.fillRect(rectX, yCursor, rectW, lineHeight);
           }
           yCursor += lineHeight;
         });
       });
-      this.ctx.restore();
+      ctx.restore();
     }
 
     paragraphs.forEach((paragraph, pindex) => {
       paragraph.lines.forEach((line, lindex) => {
+        // Only render lines within the page's line range
+        if (
+          (paragraph === paragraphs[0] && lindex < startLineIndex) ||
+          (paragraph === paragraphs[paragraphs.length - 1] && lindex > endLineIndex)
+        ) {
+          return;
+        }
+
         // Render cursor if it's in the current line
         if (
           structurePosition.paragraphIndex === pindex &&
@@ -234,7 +283,7 @@ export class TextRenderer {
           !this.editor.selectionManager.hasSelection()
         ) {
           if (this.editor.debugConfig.showCursor) {
-            this.ctx.fillRect(structurePosition.pixelOffsetInLine + leftMargin, 0, 2, lineHeight);
+            ctx.fillRect(structurePosition.pixelOffsetInLine + leftMargin, 0, 2, lineHeight);
           }
         }
 
@@ -244,18 +293,18 @@ export class TextRenderer {
           const distributeSpace = spaceCount > 0 ? lineLenghtRest / spaceCount : 0;
 
           if (distributeSpace < 10) {
-            this.ctx.wordSpacing = distributeSpace + 'px';
+            ctx.wordSpacing = distributeSpace + 'px';
           }
         }
 
-        this.ctx.translate(0, lineHeight);
-        this.renderLine(line.text, leftMargin, 0);
+        ctx.translate(0, lineHeight);
+        this.renderLine(ctx, line.text, leftMargin, 0);
       });
     });
 
-    this.ctx.restore();
+    ctx.restore();
 
     // Always render debug overlay pass (will only show text if enabled)
-    this.renderDebugInfo(lineHeight);
+    this.renderDebugInfo(ctx, lineHeight);
   }
 }

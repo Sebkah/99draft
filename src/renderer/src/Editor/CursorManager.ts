@@ -14,6 +14,7 @@ export type StructurePosition = {
 export type MousePosition = {
   x: number;
   y: number;
+  page: number;
 };
 
 export class CursorManager {

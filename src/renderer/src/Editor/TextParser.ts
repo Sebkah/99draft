@@ -1,6 +1,7 @@
 import { Editor } from './Editor';
 import { PieceTable } from './PieceTable/PieceTable';
 import { Paragraph } from './Paragraph';
+import { Page } from './Page';
 
 /**
  * Represents a line of text with associated metadata.
@@ -28,15 +29,17 @@ export type Line = {
   wordCharOffsets: number[];
 };
 
-type Pages = {};
-
 export class TextParser {
   private pieceTable: PieceTable;
   private paragraphs: Paragraph[] = [];
   private ctx: CanvasRenderingContext2D;
   private editor: Editor;
 
-  private pages: Pages[] = [];
+  private pages: Page[] = [];
+
+  public getPages(): Page[] {
+    return this.pages;
+  }
 
   constructor(pieceTable: PieceTable, ctx: CanvasRenderingContext2D, editor: Editor) {
     this.pieceTable = pieceTable;
@@ -46,10 +49,115 @@ export class TextParser {
     this.splitIntoParagraphs();
 
     this.splitAllParagraphsIntoLines();
+
+    this.splitParagraphsIntoPages();
   }
 
   public getParagraphs(): Paragraph[] {
     return this.paragraphs;
+  }
+
+  public splitParagraphsIntoPages(): void {
+    const pages: Page[] = [];
+    const maxHeight = this.editor.wrappingHeight;
+    const lineHeight = 20; // Assuming a fixed line height for simplicity
+
+    // Early exit if no paragraphs exist
+    if (this.paragraphs.length === 0) {
+      this.pages = [];
+      return;
+    }
+
+    // Calculate how many lines can fit on a single page
+    const maxLinesPerPage = Math.floor(maxHeight / lineHeight);
+
+    // If a page can't even fit a single line, we have a problem
+    if (maxLinesPerPage < 1) {
+      console.warn('Page height too small to fit even one line');
+      this.pages = [];
+      return;
+    }
+
+    let currentPage: Page | undefined = undefined; // Current page being built
+    let currentNumberOfLines = 0; // Lines already used in current page
+
+    // Iterate through all paragraphs to distribute them across pages
+    for (let pIndex = 0; pIndex < this.paragraphs.length; pIndex++) {
+      const paragraph = this.paragraphs[pIndex];
+
+      // Skip empty paragraphs (paragraphs with no lines)
+      if (paragraph.lines.length === 0) {
+        console.log(`Skipping empty paragraph ${pIndex} with ${paragraph.lines.length} lines`);
+        continue;
+      }
+
+      console.log(`Processing paragraph ${pIndex} with ${paragraph.lines.length} lines`);
+
+      let remainingLinesInParagraph = paragraph.lines.length;
+
+      // Process all lines in the current paragraph, potentially across multiple pages
+      while (remainingLinesInParagraph > 0) {
+        const numberOfFreeLines = maxLinesPerPage - currentNumberOfLines;
+
+        // Calculate the current line index within the paragraph based on remaining lines
+        const currentLineIndexInParagraph = paragraph.lines.length - remainingLinesInParagraph;
+
+        // Case 1: The remaining lines of the paragraph fit entirely on the current page
+        if (remainingLinesInParagraph <= numberOfFreeLines) {
+          // If there's no current page, start a new one with this paragraph
+          if (!currentPage) {
+            const endLineIndex = currentLineIndexInParagraph + remainingLinesInParagraph - 1;
+            console.log(
+              `Creating new page: P${pIndex}:L${currentLineIndexInParagraph} -> P${pIndex}:L${endLineIndex}`,
+            );
+            currentPage = new Page(pIndex, pIndex, currentLineIndexInParagraph, endLineIndex);
+            pages.push(currentPage);
+          }
+          // Extend the current page to include this paragraph
+          else {
+            const endLineIndex = currentLineIndexInParagraph + remainingLinesInParagraph - 1;
+            console.log(`Extending page to: P${pIndex}:L${endLineIndex}`);
+            currentPage.extendTo(pIndex, endLineIndex);
+          }
+
+          // Update counters - all remaining lines are now accounted for
+          currentNumberOfLines += remainingLinesInParagraph;
+          remainingLinesInParagraph = 0;
+        }
+        // Case 2: The paragraph has more lines than can fit on the current page
+        else {
+          // If there's no current page, start a new one
+          if (!currentPage) {
+            currentPage = new Page(
+              pIndex,
+              pIndex,
+              currentLineIndexInParagraph,
+              currentLineIndexInParagraph + numberOfFreeLines - 1,
+            );
+            pages.push(currentPage);
+          }
+          // Extend the current page to fill it completely
+          else {
+            currentPage.extendTo(pIndex, currentLineIndexInParagraph + numberOfFreeLines - 1);
+          }
+
+          // Update counters for the lines we just allocated
+          currentNumberOfLines += numberOfFreeLines;
+          remainingLinesInParagraph -= numberOfFreeLines;
+
+          // Current page is now full, so we need to start a new page for remaining lines
+          currentPage = undefined;
+          currentNumberOfLines = 0;
+        }
+      }
+    }
+
+    // Store the computed pages
+    this.pages = pages;
+    console.log('Page splitting completed. Created', pages.length, 'pages:');
+    pages.forEach((page, index) => {
+      console.log(`Page ${index}:`, page.toString());
+    });
   }
 
   public splitAllParagraphsIntoLines(): void {
@@ -117,9 +225,11 @@ export class TextParser {
     }
   }
 
-  //TODO: rewrite this
   // Split a paragraph into lines based on the canvas width
   public splitParagraphIntoLines(paragraph: Paragraph): void {
+    // Ensure canvas context has correct font for measurements
+    this.ctx.font = '16px Arial';
+
     const maxWidth = this.editor.wrappingWidth;
     // Split while preserving spaces
     const tokens = paragraph.text.split(/(\s+)/);

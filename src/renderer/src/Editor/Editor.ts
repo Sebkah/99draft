@@ -64,21 +64,37 @@ export class Editor {
   };
   public debugConfig: DebugConfig;
 
-  private canvas: HTMLCanvasElement | null = null;
+  private internalCanvas: HTMLCanvasElement;
   private debugUpdateCallback?: (pieces: PieceDebug[]) => void;
+  private pageCountChangeCallback?: (pageCount: number) => void;
+
+  public get numberOfPages(): number {
+    return this.textParser.getPages().length;
+  }
 
   // Getter for wrapping width
   public get wrappingWidth(): number {
-    if (!this.canvas) return 700; // Default width if canvas not set
-    return this.canvas.width - this.margins.left - this.margins.right;
+    return this.internalCanvas.width - this.margins.left - this.margins.right;
   }
 
-  constructor(initialText: string, ctx: CanvasRenderingContext2D, margins: Margins) {
+  public get wrappingHeight(): number {
+    return this.internalCanvas.height - this.margins.top - this.margins.bottom;
+  }
+
+  constructor(initialText: string, margins: Margins, width: number, height: number) {
+    // Initialize an internal canvas for offscreen measurements if needed
+    this.internalCanvas = document.createElement('canvas');
+    this.internalCanvas.width = width;
+    this.internalCanvas.height = height;
+
+    const ctx = this.internalCanvas.getContext('2d');
+    if (!ctx) throw new Error('Failed to create internal canvas context');
+
+    // Set font for internal canvas context to match rendering font
+    ctx.font = '16px Arial';
+
     // Initialize piece table with provided text
     this.pieceTable = new PieceTable(initialText);
-
-    // Store canvas reference
-    this.canvas = ctx.canvas;
 
     // Set initial margins if provided
     if (margins.left !== undefined) this.margins.left = margins.left;
@@ -97,7 +113,7 @@ export class Editor {
 
     // Initialize text renderer and input manager
     this.textParser = new TextParser(this.pieceTable, ctx, this);
-    this.textRenderer = new TextRenderer(ctx, this.textParser, this);
+    this.textRenderer = new TextRenderer(this.textParser, this);
     this.cursorManager = new CursorManager(
       Math.floor(this.pieceTable.length / 2),
       this.textParser,
@@ -107,11 +123,56 @@ export class Editor {
     this.selectionManager = new SelectionManager(this, this.cursorManager);
     this.cursorManager.setSelectionManager(this.selectionManager);
     this.inputManager = new InputManager(this.textRenderer, this.cursorManager, this);
+  }
 
-    this.textRenderer.render();
+  initialize(): void {
+    this.renderPages();
+  }
 
-    // Set initial margins and render
+  linkCanvases(canvases: HTMLCanvasElement[] | null): void {
+    if (!canvases || canvases.length === 0) return;
+
+    console.log('Linking canvases:', canvases.length, 'canvases for', this.numberOfPages, 'pages');
+
+    const ctxs = canvases
+      .map((canvas) => canvas.getContext('2d'))
+      .filter((ctx): ctx is CanvasRenderingContext2D => ctx !== null);
+
+    this.textRenderer.updateContexts(ctxs);
+    this.synchronizeFontSettings(ctxs);
+
+    // Call updateMargins for initial setup
     this.updateMargins();
+  }
+
+  /**
+   * Re-link canvases without triggering margin updates (to avoid infinite loops)
+   * Used when the number of pages changes and canvases are recreated
+   */
+  relinkCanvases(canvases: HTMLCanvasElement[]): void {
+    console.log(
+      'Re-linking canvases:',
+      canvases.length,
+      'canvases for',
+      this.numberOfPages,
+      'pages',
+    );
+
+    const ctxs = canvases
+      .map((canvas) => canvas.getContext('2d'))
+      .filter((ctx): ctx is CanvasRenderingContext2D => ctx !== null);
+
+    this.textRenderer.updateContexts(ctxs);
+    this.synchronizeFontSettings(ctxs);
+
+    // Only render, don't update margins
+    this.renderPages();
+  }
+
+  renderPages(): void {
+    for (let i = 0; i < this.numberOfPages; i++) {
+      this.textRenderer.render(i);
+    }
   }
 
   /**
@@ -126,15 +187,32 @@ export class Editor {
 
   startSelection(mousePosition: MousePosition): void {
     this.selectionManager.startSelection(mousePosition);
-    this.textRenderer.render();
+    this.renderPages();
   }
   updateSelection(mousePosition: MousePosition): void {
     this.selectionManager.updateSelection(mousePosition);
-    this.textRenderer.render();
+    this.renderPages();
   }
   endSelection(mousePosition: MousePosition): void {
     this.selectionManager.endSelection(mousePosition);
-    this.textRenderer.render();
+    this.renderPages();
+  }
+
+  /**
+   * Set a callback to be called when the number of pages changes
+   * @param callback - Function to call when page count changes
+   */
+  setPageCountChangeCallback(callback: (pageCount: number) => void): void {
+    this.pageCountChangeCallback = callback;
+  }
+
+  /**
+   * Notify about page count changes
+   */
+  private notifyPageCountChange(): void {
+    if (this.pageCountChangeCallback) {
+      this.pageCountChangeCallback(this.numberOfPages);
+    }
   }
 
   /**
@@ -159,8 +237,30 @@ export class Editor {
     if (rightMargin !== undefined) this.margins.right = rightMargin;
 
     this.textParser.splitAllParagraphsIntoLines();
+    this.textParser.splitParagraphsIntoPages();
     this.cursorManager.mapLinearToStructure();
-    this.textRenderer.render();
+    this.renderPages();
+    this.notifyPageCountChange(); // Notify about page count changes
+  }
+
+  /**
+   * Synchronize font settings between internal canvas context and rendering contexts
+   * This ensures text measurements match actual rendering
+   * @param ctxs - Array of rendering contexts to synchronize with
+   */
+  private synchronizeFontSettings(ctxs: CanvasRenderingContext2D[]): void {
+    const font = '16px Arial'; // Keep this consistent with TextRenderer.setBaseTextStyle()
+
+    // Set font on internal canvas context used for measurements
+    const internalCtx = this.internalCanvas.getContext('2d');
+    if (internalCtx) {
+      internalCtx.font = font;
+    }
+
+    // Set font on all rendering contexts
+    ctxs.forEach((ctx) => {
+      ctx.font = font;
+    });
   }
 
   /**
@@ -218,12 +318,14 @@ export class Editor {
 
     this.textParser.reparseParagraph(this.cursorManager.getPosition(), text.length);
 
-    /*  this.cursorPosition = Math.min(this.pieceTable.length, this.cursorPosition + text.length); */
     this.cursorManager.setCursorPosition(
       Math.min(this.pieceTable.length, this.cursorManager.getPosition() + text.length),
     );
 
-    this.textRenderer.render();
+    this.textParser.splitParagraphsIntoPages();
+
+    this.renderPages();
+    this.notifyPageCountChange(); // Notify about page count changes
     this.emitDebugUpdate();
   }
 
@@ -235,7 +337,7 @@ export class Editor {
       this.textParser.splitIntoParagraphs();
       this.textParser.splitAllParagraphsIntoLines();
       this.cursorManager.mapLinearToStructure();
-      this.textRenderer.render();
+      this.renderPages();
       this.emitDebugUpdate();
       return;
     }
@@ -249,7 +351,7 @@ export class Editor {
       this.textParser.splitAllParagraphsIntoLines();
 
       this.cursorManager.mapLinearToStructure();
-      this.textRenderer.render();
+      this.renderPages();
       this.emitDebugUpdate();
     }
   }
@@ -257,12 +359,14 @@ export class Editor {
   insertLineBreak(): void {
     this.pieceTable.insert('\n', this.cursorManager.getPosition());
     this.textParser.splitParagraph(this.cursorManager.getPosition());
+    this.textParser.splitParagraphsIntoPages();
 
     this.cursorManager.setCursorPosition(
       Math.min(this.pieceTable.length, this.cursorManager.getPosition() + 1),
     );
 
-    this.textRenderer.render();
+    this.renderPages();
+    this.notifyPageCountChange(); // Notify about page count changes
     this.emitDebugUpdate();
   }
 
