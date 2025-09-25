@@ -8,11 +8,11 @@ export type { Piece } from './PieceTable/PieceTable';
 
 // Text processing
 export { TextParser } from './TextParser';
-export { TextRenderer } from './TextRenderer';
+export { TextRenderer } from './renderers/TextRenderer';
 
 // Export renderers
-export { PDFRenderer } from './PDFRenderer';
-export { DOCXRenderer } from './DOCXRenderer';
+export { PDFRenderer } from './renderers/PDFRenderer';
+export { DOCXRenderer } from './renderers/DOCXRenderer';
 
 // Cursor and selection management
 export { CursorManager } from './CursorManager';

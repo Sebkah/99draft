@@ -1,4 +1,6 @@
-/* Basic app styles - Tailwind will be handled by the React package */
+@import "tailwindcss";
+
+/* Basic app styles */
 
 body {
   height: 100vh;

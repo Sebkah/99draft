@@ -1,12 +1,12 @@
 import { PieceTable } from './PieceTable/PieceTable';
-import { TextRenderer } from './TextRenderer';
-import { PDFRenderer } from './PDFRenderer';
-import { DOCXRenderer } from './DOCXRenderer';
+
 import { InputManager } from './Input/InputManager';
 import { TextParser } from './TextParser';
 import { CursorManager, MousePosition } from './CursorManager';
 import { SelectionManager } from './SelectionManager';
 import { createEditorLogger, type EditorLogger } from './EditorLogger';
+import { TextRenderer, PDFRenderer, DOCXRenderer } from '.';
+import { ParagraphStylesManager } from './styles/ParagraphStylesManager';
 
 /**
  * Type definition for debugging piece table structure
@@ -72,6 +72,8 @@ export class Editor {
   public cursorManager: CursorManager;
   public selectionManager: SelectionManager;
 
+  public paragraphStylesManager: ParagraphStylesManager;
+
   public margins: { left: number; right: number; top: number; bottom: number } = {
     left: 50,
     right: 50,
@@ -81,9 +83,8 @@ export class Editor {
   public debugConfig: DebugConfig;
   public logger: EditorLogger;
 
-  private internalCanvas: HTMLCanvasElement;
+  public internalCanvas: HTMLCanvasElement;
   private debugUpdateCallback?: (pieces: PieceDebug[]) => void;
-  private pageCountChangeCallback?: (pageCount: number) => void;
 
   public get numberOfPages(): number {
     return this.textParser.getPages().length;
@@ -140,6 +141,9 @@ export class Editor {
 
     // Initialize text renderer and input manager
     this.textParser = new TextParser(this.pieceTable, ctx, this);
+
+    this.paragraphStylesManager = new ParagraphStylesManager(this.textParser);
+
     this.textRenderer = new TextRenderer(this.textParser, this);
     this.pdfRenderer = new PDFRenderer(this.textParser, this);
     this.docxRenderer = new DOCXRenderer(this.textParser, this);
@@ -158,50 +162,40 @@ export class Editor {
     this.renderPages();
   }
 
-  linkCanvases(canvases: HTMLCanvasElement[] | null): void {
+  /**
+   * Link canvases to the editor's text renderer
+   * @param canvases - Array of canvas elements to link
+   * @param skipMarginsUpdate - If true, only renders pages without updating margins (used when relinking after page count changes)
+   */
+  linkCanvases(canvases: HTMLCanvasElement[] | null, skipMarginsUpdate = false): void {
     if (!canvases || canvases.length === 0) return;
 
+    // Filter out null canvas elements that may exist when page count decreases
+    const validCanvases = canvases.filter((canvas): canvas is HTMLCanvasElement => canvas !== null);
+
+    const operation = skipMarginsUpdate ? 'Re-linking' : 'Linking';
     this.logger.canvasLinking(
-      'Linking canvases:',
-      canvases.length,
-      'canvases for',
+      `${operation} canvases:`,
+      validCanvases.length,
+      'valid canvases for',
       this.numberOfPages,
       'pages',
     );
 
-    const ctxs = canvases
+    const ctxs = validCanvases
       .map((canvas) => canvas.getContext('2d'))
       .filter((ctx): ctx is CanvasRenderingContext2D => ctx !== null);
 
     this.textRenderer.updateContexts(ctxs);
     this.synchronizeFontSettings(ctxs);
 
-    // Call updateMargins for initial setup
-    this.updateMargins();
-  }
-
-  /**
-   * Re-link canvases without triggering margin updates (to avoid infinite loops)
-   * Used when the number of pages changes and canvases are recreated
-   */
-  relinkCanvases(canvases: HTMLCanvasElement[]): void {
-    this.logger.canvasLinking(
-      'Re-linking canvases:',
-      canvases.length,
-      'canvases for',
-      this.numberOfPages,
-      'pages',
-    );
-
-    const ctxs = canvases
-      .map((canvas) => canvas.getContext('2d'))
-      .filter((ctx): ctx is CanvasRenderingContext2D => ctx !== null);
-
-    this.textRenderer.updateContexts(ctxs);
-    this.synchronizeFontSettings(ctxs);
-
-    // Only render, don't update margins
-    this.renderPages();
+    if (skipMarginsUpdate) {
+      // Only render pages, don't update margins (avoids infinite loops during page count changes)
+      this.renderPages();
+    } else {
+      // Full initialization with margin updates
+      this.updateMargins();
+    }
   }
 
   renderPages(): void {
@@ -238,16 +232,8 @@ export class Editor {
    * @param callback - Function to call when page count changes
    */
   setPageCountChangeCallback(callback: (pageCount: number) => void): void {
-    this.pageCountChangeCallback = callback;
-  }
-
-  /**
-   * Notify about page count changes
-   */
-  private notifyPageCountChange(): void {
-    if (this.pageCountChangeCallback) {
-      this.pageCountChangeCallback(this.numberOfPages);
-    }
+    // Delegate to TextParser which is responsible for page management
+    this.textParser.setPageCountChangeCallback(callback);
   }
 
   /**
@@ -275,7 +261,6 @@ export class Editor {
     this.textParser.splitParagraphsIntoPages();
     this.cursorManager.mapLinearToStructure();
     this.renderPages();
-    this.notifyPageCountChange(); // Notify about page count changes
   }
 
   /**
@@ -342,6 +327,7 @@ export class Editor {
         if (part.length > 0) {
           this.insertText(part);
         }
+        // Insert line break between parts (if not the last part)
         if (index < parts.length - 1) {
           this.insertLineBreak();
         }
@@ -360,7 +346,6 @@ export class Editor {
     this.textParser.splitParagraphsIntoPages();
 
     this.renderPages();
-    this.notifyPageCountChange(); // Notify about page count changes
     this.emitDebugUpdate();
   }
 
@@ -371,6 +356,7 @@ export class Editor {
     if (deletedRange) {
       this.textParser.splitIntoParagraphs();
       this.textParser.splitAllParagraphsIntoLines();
+      this.textParser.splitParagraphsIntoPages();
       this.cursorManager.mapLinearToStructure();
       this.renderPages();
       this.emitDebugUpdate();
@@ -378,6 +364,15 @@ export class Editor {
     }
 
     if (this.cursorManager.getPosition() > 0) {
+      // Check if we are deleting a newline character
+      const charBefore = this.pieceTable.getRangeText(this.cursorManager.getPosition() - 1, 1);
+      if (charBefore === '\n') {
+        // Merging paragraphs, so update paragraph styles accordingly
+        this.paragraphStylesManager.mergeParagraphs(
+          this.textParser.findParagraphIndexAtOffset(this.cursorManager.getPosition()),
+        );
+      }
+
       this.pieceTable.delete(this.cursorManager.getPosition() - 1, length);
 
       this.cursorManager.setCursorPosition(Math.max(0, this.cursorManager.getPosition() - length));
@@ -402,7 +397,6 @@ export class Editor {
     );
 
     this.renderPages();
-    this.notifyPageCountChange(); // Notify about page count changes
     this.emitDebugUpdate();
   }
 

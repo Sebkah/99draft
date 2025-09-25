@@ -1,14 +1,13 @@
 import React, { useState, useRef, useCallback } from 'react';
+import { Editor } from '@99draft/editor-core';
 import RulerPin from './RulerPin';
 
 interface RulerProps {
   width: number;
-  // leftMargin: pixels from left edge
-  leftMargin: number;
-  // rightMargin: pixels from right edge
-  rightMargin: number;
-  onLeftMarginChange: (position: number) => void;
-  onRightMarginChange: (position: number) => void;
+  editor: Editor;
+  // Default margin values (optional)
+  defaultLeftMargin?: number;
+  defaultRightMargin?: number;
 }
 
 /**
@@ -17,14 +16,22 @@ interface RulerProps {
  */
 const Ruler: React.FC<RulerProps> = ({
   width,
-  leftMargin,
-  rightMargin,
-  onLeftMarginChange,
-  onRightMarginChange,
+  editor,
+  defaultLeftMargin = 100,
+  defaultRightMargin = 100,
 }) => {
+  // Internal state for margins
+  const [leftMargin, setLeftMargin] = useState<number>(defaultLeftMargin);
+  const [rightMargin, setRightMargin] = useState<number>(defaultRightMargin);
+
   // single dragging state: 'left' | 'right' | null
   const [dragging, setDragging] = useState<'left' | 'right' | null>(null);
   const rulerRef = useRef<HTMLDivElement>(null);
+
+  // Initialize editor margins on mount
+  React.useEffect(() => {
+    editor.setMargins(leftMargin, rightMargin);
+  }, [editor, leftMargin, rightMargin]);
 
   /**
    * Calculate position from mouse event relative to ruler
@@ -69,23 +76,17 @@ const Ruler: React.FC<RulerProps> = ({
         // new left margin must be <= width - rightMargin - minGap
         const maxLeft = width - rightMargin - minGap;
         const newLeft = Math.max(0, Math.min(pos, maxLeft));
-        onLeftMarginChange(newLeft);
+        setLeftMargin(newLeft);
+        editor.setMargins(newLeft, rightMargin);
       } else if (dragging === 'right') {
         // rightMargin is distance from right edge. newRight must be <= width - leftMargin - minGap
         const maxRight = width - leftMargin - minGap;
         const newRight = Math.max(0, Math.min(rightPos, maxRight));
-        onRightMarginChange(newRight);
+        setRightMargin(newRight);
+        editor.setMargins(leftMargin, newRight);
       }
     },
-    [
-      dragging,
-      getPositionFromEvent,
-      onLeftMarginChange,
-      onRightMarginChange,
-      leftMargin,
-      rightMargin,
-      width,
-    ],
+    [dragging, getPositionFromEvent, leftMargin, rightMargin, width, editor],
   );
 
   /**

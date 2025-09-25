@@ -1,5 +1,5 @@
-import { TextParser } from './TextParser';
-import { Editor } from './Editor';
+import { Editor } from "..";
+import { TextParser } from "../TextParser";
 
 /**
  * PDFRenderer handles the generation of HTML content for PDF export.

@@ -36,6 +36,10 @@ export class TextParser {
   private editor: Editor;
 
   private pages: Page[] = [];
+  private lastPageCount: number = 0;
+
+  private paragraphStylesManager;
+  private pageCountChangeCallback?: (pageCount: number) => void;
 
   public getPages(): Page[] {
     return this.pages;
@@ -46,11 +50,40 @@ export class TextParser {
     this.ctx = ctx;
     this.editor = editor;
 
+    this.paragraphStylesManager = editor.paragraphStylesManager;
+
     this.splitIntoParagraphs();
 
     this.splitAllParagraphsIntoLines();
 
     this.splitParagraphsIntoPages();
+  }
+
+  /**
+   * Set a callback to be called when the number of pages changes
+   * @param callback - Function to call when page count changes
+   */
+  setPageCountChangeCallback(callback: (pageCount: number) => void): void {
+    this.pageCountChangeCallback = callback;
+  }
+
+  /**
+   * Notify about page count changes
+   */
+  private notifyPageCountChange(): void {
+    if (this.pageCountChangeCallback) {
+      const currentPageCount = this.pages.length;
+      if (this.lastPageCount !== currentPageCount) {
+        this.editor.logger.pageManagement(
+          'Page count changed:',
+          this.lastPageCount,
+          '->',
+          currentPageCount,
+        );
+        this.lastPageCount = currentPageCount;
+        this.pageCountChangeCallback(currentPageCount);
+      }
+    }
   }
 
   public getParagraphs(): Paragraph[] {
@@ -169,12 +202,15 @@ export class TextParser {
     pages.forEach((page, index) => {
       this.editor.logger.pageManagement(`Page ${index}:`, page.toString());
     });
+
+    // Notify about page count changes
+    this.notifyPageCountChange();
   }
 
   public splitAllParagraphsIntoLines(): void {
-    this.paragraphs.forEach((paragraph) => {
-      this.splitParagraphIntoLines(paragraph);
-    });
+    for (let i = 0; i < this.paragraphs.length; i++) {
+      this.splitParagraphIntoLines(i);
+    }
   }
 
   /*
@@ -195,7 +231,7 @@ export class TextParser {
       this.paragraphs[i].shiftOffset(editLength);
     }
 
-    this.splitParagraphIntoLines(paragraph);
+    this.splitParagraphIntoLines(paragraphIndex);
   }
 
   // Split the text into paragraphs based on newlines
@@ -237,11 +273,22 @@ export class TextParser {
   }
 
   // Split a paragraph into lines based on the canvas width
-  public splitParagraphIntoLines(paragraph: Paragraph): void {
+  public splitParagraphIntoLines(paragraphIndex: number): void {
+    const paragraph = this.paragraphs[paragraphIndex];
+
     // Ensure canvas context has correct font for measurements
     this.ctx.font = '16px Arial';
 
-    const maxWidth = this.editor.wrappingWidth;
+    // Get paragraph-specific styles
+    const styles = this.paragraphStylesManager.getParagraphStyles(paragraphIndex);
+
+    // Merge margins with editor defaults
+    const marginLeft = styles.marginLeft ?? this.editor.margins.left;
+    const marginRight = styles.marginRight ?? this.editor.margins.right;
+
+    const wrappingWidth = this.editor.internalCanvas.width - marginLeft - marginRight;
+
+    const maxWidth = wrappingWidth;
     // Split while preserving spaces
     const tokens = paragraph.text.split(/(\s+)/);
     const lines: Line[] = [];
@@ -372,9 +419,15 @@ export class TextParser {
     const currentParagraph = this.paragraphs[paragraphIndex];
     const splitPosition = cursorPosition - currentParagraph.offset;
 
+    // Get the updated text from the piece table (source of truth)
+    const fullParagraphText = this.pieceTable.getRangeText(
+      currentParagraph.offset,
+      currentParagraph.length,
+    );
+
     // Split the paragraph text
-    const beforeText = currentParagraph.text.substring(0, splitPosition);
-    const afterText = currentParagraph.text.substring(splitPosition);
+    const beforeText = fullParagraphText.substring(0, splitPosition);
+    const afterText = fullParagraphText.substring(splitPosition);
 
     // Update the current paragraph with the "before" text
     currentParagraph.updateText(beforeText);
@@ -392,8 +445,8 @@ export class TextParser {
     }
 
     // Only reparse the affected paragraphs into lines
-    this.splitParagraphIntoLines(currentParagraph);
-    this.splitParagraphIntoLines(newParagraph);
+    this.splitParagraphIntoLines(paragraphIndex);
+    this.splitParagraphIntoLines(paragraphIndex + 1);
   }
 
   public deleteTextInParagraph(position: number, length: number): void {
@@ -412,7 +465,7 @@ export class TextParser {
     }
 
     // Only reparse the affected paragraph
-    this.splitParagraphIntoLines(paragraph);
+    this.splitParagraphIntoLines(paragraphIndex);
   }
 
   public optimizedDelete(position: number, length: number): void {
@@ -430,36 +483,7 @@ export class TextParser {
     }
   }
 
-  public mapPixelCoordinateToStructure(x: number, y: number): [number, number, number] {
-    const lineHeight = 20; // Height of each line
-    const leftMargin = this.editor.margins.left; // Left margin for the text
-    const adjustedX = x - leftMargin; // Adjust x for left margin
-    const lineIndex = Math.floor(y / lineHeight);
-
-    let accumulatedLines = 0;
-    for (let pIndex = 0; pIndex < this.paragraphs.length; pIndex++) {
-      const paragraph = this.paragraphs[pIndex];
-      if (lineIndex < accumulatedLines + paragraph.lines.length) {
-        const lineInParagraph = lineIndex - accumulatedLines;
-        const line = paragraph.lines[lineInParagraph];
-        // Now find the character index in the line based on adjustedX
-        let charIndex = 0;
-        let currentWidth = 0;
-        for (let i = 0; i < line.text.length; i++) {
-          const char = line.text[i];
-          const charWidth = this.ctx.measureText(char).width;
-          if (currentWidth + charWidth / 2 >= adjustedX) {
-            break;
-          }
-          currentWidth += charWidth;
-          charIndex++;
-        }
-        return [pIndex, lineInParagraph, charIndex];
-      }
-      accumulatedLines += paragraph.lines.length;
-    }
-    return [-1, -1, -1]; // Not found
+  public getParagraph(index: number): Paragraph | null {
+    return this.paragraphs[index] || null;
   }
-
-  // Map cursor position to paragraph, line, and pixel offset
 }

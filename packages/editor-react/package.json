@@ -15,7 +15,7 @@
   "scripts": {
     "build": "npm run build:css && tsc",
     "build:css": "npx tailwindcss -i ./src/styles.css -o ./dist/styles.css",
-    "dev": "npm run dev:css & tsc --watch",
+    "dev": "npm run dev:css --watch && tsc --watch",
     "dev:css": "npx tailwindcss -i ./src/styles.css -o ./dist/styles.css --watch",
     "clean": "rm -rf dist",
     "typecheck": "tsc --noEmit"

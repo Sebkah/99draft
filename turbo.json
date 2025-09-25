@@ -6,9 +6,13 @@
       "dependsOn": ["^build"],
       "outputs": ["dist/**", "out/**", ".next/**", "!.next/cache/**"]
     },
+    "build:css": {
+      "outputs": ["dist/styles.css"]
+    },
     "dev": {
       "cache": false,
-      "persistent": true
+      "persistent": true,
+      "dependsOn": ["build:css"]
     },
     "typecheck": {
       "dependsOn": ["^typecheck"],

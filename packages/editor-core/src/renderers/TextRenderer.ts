@@ -1,5 +1,5 @@
-import { Editor } from './Editor';
-import { TextParser } from './TextParser';
+import { Editor } from "../Editor";
+import { TextParser } from "../TextParser";
 
 export class TextRenderer {
   private ctxs: (CanvasRenderingContext2D | null)[] = [];

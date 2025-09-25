@@ -6,7 +6,7 @@ type Props = {
   editor: Editor;
 };
 
-const DebugPanelNew: React.FC<Props> = ({ editor }) => {
+const DebugPanel: React.FC<Props> = ({ editor }) => {
   const [pieces, setPieces] = useState<PieceDebug[]>([]);
   const [cursor, setCursor] = useState<{
     pos: number;
@@ -487,7 +487,7 @@ const DebugPanelNew: React.FC<Props> = ({ editor }) => {
   );
 };
 
-export default DebugPanelNew;
+export default DebugPanel;
 
 type SectionProps = {
   title: string;
