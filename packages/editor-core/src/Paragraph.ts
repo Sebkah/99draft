@@ -9,10 +9,14 @@ export class Paragraph {
   private paragraphLength: number;
   private paragraphLines: Line[] = [];
 
-  constructor(text: string, offset: number) {
+  constructor(text: string, offset: number, length?: number) {
     this.paragraphText = text;
     this.paragraphOffset = offset;
-    this.paragraphLength = text.length;
+    if (length) {
+      this.paragraphLength = length;
+    } else {
+      this.paragraphLength = text.length;
+    }
   }
 
   // Getters
@@ -33,13 +37,17 @@ export class Paragraph {
   }
 
   // Utility methods
-  public updateText(newText: string): void {
+  public updateText(newText: string, updateLength: boolean): void {
     this.paragraphText = newText;
-    this.paragraphLength = newText.length;
+    if (updateLength) this.paragraphLength = newText.length;
   }
 
-  public updateLength(delta: number): void {
+  public adjustLength(delta: number): void {
     this.paragraphLength += delta;
+  }
+
+  public setLength(newLength: number): void {
+    this.paragraphLength = newLength;
   }
 
   public shiftOffset(delta: number): void {

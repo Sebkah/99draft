@@ -3,11 +3,11 @@ import { TextParser } from '../TextParser';
 export type ParagraphStyle = {
   marginLeft?: number;
   marginRight?: number;
+  align?: 'left' | 'center' | 'right' | 'justify';
   lineHeight?: number;
 };
 
 export class ParagraphStylesManager {
-  private textParser: TextParser;
   private styles: ParagraphStyle[] = [
     {
       marginLeft: 0,
@@ -27,8 +27,7 @@ export class ParagraphStylesManager {
     },
   ];
 
-  constructor($textParser: TextParser, $styles?: ParagraphStyle[]) {
-    this.textParser = $textParser;
+  constructor($styles?: ParagraphStyle[]) {
     if ($styles) this.styles = $styles;
   }
 
@@ -44,11 +43,14 @@ export class ParagraphStylesManager {
     const currentStyles = this.getParagraphStyles(paragraphIndex);
     this.styles.splice(paragraphIndex + 1, 0, { ...currentStyles });
   }
-  mergeParagraphs(paragraphIndex: number) {
-    // If the text of the paragraph before is empty (just a newline)
-    if (this.textParser.getParagraph(paragraphIndex - 1)?.text.trim() === '') {
+  /**
+   * Merge paragraph styles by removing the next paragraph's style or the current empty one.
+   */
+  mergeWithNextParagraphStyle(paragraphIndex: number, _textParser: TextParser) {
+    // If the text of the paragraph is empty (just a newline)
+    if (_textParser.getParagraph(paragraphIndex)?.text === '') {
       // Remove the styles of the empty paragraph
-      this.styles.splice(paragraphIndex - 1, 1);
+      this.styles.splice(paragraphIndex, 1);
       return;
     }
 

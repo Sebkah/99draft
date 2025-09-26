@@ -143,16 +143,19 @@ export class CursorManager {
 
       const cursorOffsetInParagraph = cursorPosition - paragraph.offset;
 
-      const isOnlyLine = paragraph.lines.length === 1; //XXX: look into this logic
+      // This all looks very funky but works (and works like google docs)
+      const isOnlyLine = paragraph.lines.length === 1;
       const isLastLine = j === paragraph.lines.length - 1;
 
       const isLastLineButNotOnlyLine = isLastLine && !isOnlyLine;
 
       let endOffsetDelta = isOnlyLine ? 1 : isLastLineButNotOnlyLine ? 1 : 0;
 
+      // Allow cursor to be positioned at the end of any line, including trailing whitespace
+      // Use <= instead of < to include the position exactly at the end of the line
       if (
         cursorOffsetInParagraph >= line.offset &&
-        cursorOffsetInParagraph < line.offset + line.length + endOffsetDelta
+        cursorOffsetInParagraph <= line.offset + line.length + endOffsetDelta
       ) {
         lineIndex = j;
         break;
@@ -165,9 +168,13 @@ export class CursorManager {
       const cursorOffsetInParagraph = cursorPosition - paragraph.offset;
       const line = paragraph.lines[lineIndex];
       const positionInLine = cursorOffsetInParagraph - line.offset;
-      const textBeforeCursor = line.text.substring(0, positionInLine);
+
+      // Ensure positionInLine doesn't exceed the line length (safety check)
+      const clampedPositionInLine = Math.min(positionInLine, line.text.length);
+
+      const textBeforeCursor = line.text.substring(0, clampedPositionInLine);
       const metrics = this.measureText(textBeforeCursor);
-      structurePosition.characterIndex = positionInLine; // Character index within the line
+      structurePosition.characterIndex = clampedPositionInLine; // Character index within the line
       structurePosition.pixelOffsetInLine = metrics.width; // Offset in pixels within the line
     }
 
@@ -275,9 +282,10 @@ export class CursorManager {
     const targetParagraph = paragraphs[paragraphIndex];
     if (!targetParagraph) return this.linearPosition; // Invalid paragraph index
     if (lineIndex < 0 || lineIndex >= targetParagraph.lines.length) return this.linearPosition; // Invalid line index
-    if (characterIndex < 0 || characterIndex > targetParagraph.lines[lineIndex].length)
-      return this.linearPosition; // Invalid character index
-    return targetParagraph.offset + targetParagraph.lines[lineIndex].offset + characterIndex;
+
+    const targetLine = targetParagraph.lines[lineIndex];
+    if (characterIndex < 0 || characterIndex > targetLine.text.length) return this.linearPosition; // Invalid character index
+    return targetParagraph.offset + targetLine.offset + characterIndex;
   }
 
   public getLineAdjacentLinearPosition(

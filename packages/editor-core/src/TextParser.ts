@@ -223,8 +223,8 @@ export class TextParser {
     if (!paragraph) return;
 
     // Update paragraph length
-    paragraph.updateLength(editLength);
-    paragraph.updateText(this.pieceTable.getRangeText(paragraph.offset, paragraph.length));
+    paragraph.adjustLength(editLength);
+    paragraph.updateText(this.pieceTable.getRangeText(paragraph.offset, paragraph.length), true);
 
     // Shift offsets for all subsequent paragraphs
     for (let i = paragraphIndex + 1; i < this.paragraphs.length; i++) {
@@ -252,8 +252,14 @@ export class TextParser {
       tokens.forEach((token) => {
         // If the token is a newline
         if (token === '\n') {
-          // End current paragraph (length is already correct)
-          currentOffset += 1; // Account for newline
+          // End current paragraph
+          currentOffset += 1; // Account for newline. Note: newline is counted at the end of the paragraph
+          // Also add this newline to the previous paragraph's length
+          /*        if (this.paragraphs.length > 0) {
+            const lastParagraph = this.paragraphs[this.paragraphs.length - 1];
+            lastParagraph.adjustLength(1); // +1 for the newline
+          } */
+
           // Start a new empty paragraph
           this.paragraphs.push(new Paragraph('', currentOffset));
         } else if (token.length > 0) {
@@ -330,12 +336,12 @@ export class TextParser {
               });
               offsetInParagraph += currentLine.length;
 
-              // Start a new line and continue processing remaining spaces
+              // Start a new line and add the space that caused the break to the new line
               wordpixelOffsets = [0]; // Always start with 0 for new lines
               wordCharOffsets = [0]; // Always start with 0 for new lines
-              currentLine = '';
-              currentSpaceWidth = 0;
-              // Continue with the same space in the next iteration
+              currentLine = token[spaceIndex]; // Add the space that caused the break
+              currentSpaceWidth = spaceWidth;
+              spaceIndex++; // Move to the next space
             } else {
               // Current line is empty, force add at least one space
               currentLine = testChar;
@@ -403,10 +409,27 @@ export class TextParser {
     paragraph.setLines(lines); // Use the new setLines method which also marks as clean
   }
 
+  /**
+   * Locate the paragraph that contains a given character offset.
+   *
+   * This function uses an inclusive model where each paragraph "owns" the position
+   * immediately after its text content (typically a newline position). This ensures
+   * there are no gaps in coverage and every valid cursor position belongs to a paragraph.
+   *
+   * See how {@link TextParser.splitIntoParagraphs} accounts for newlines when creating paragraphs.
+   * See also the {@link Paragraph} type for paragraph shape and offsets.
+   *
+   * @param offset - Character position within the full document text.
+   * @returns The paragraph index that contains the offset, or -1 if not found.
+   *
+   * @see {@link TextParser.splitIntoParagraphs}
+   */
   public findParagraphIndexAtOffset(offset: number): number {
     for (let i = 0; i < this.paragraphs.length; i++) {
       const paragraph = this.paragraphs[i];
-      if (offset >= paragraph.offset && offset < paragraph.offset + paragraph.length + 1) {
+      // Each paragraph owns [offset, offset + length + 1)
+      // The +1 ensures newline positions belong to the preceding paragraph
+      if (offset >= paragraph.offset && offset <= paragraph.offset + paragraph.length + 1) {
         return i;
       }
     }
@@ -430,8 +453,8 @@ export class TextParser {
     const afterText = fullParagraphText.substring(splitPosition);
 
     // Update the current paragraph with the "before" text
-    currentParagraph.updateText(beforeText);
-    currentParagraph.updateLength(beforeText.length - currentParagraph.length);
+    currentParagraph.updateText(beforeText, false);
+    currentParagraph.adjustLength(beforeText.length - currentParagraph.length);
 
     // Create new paragraph with the "after" text
     const newParagraph = new Paragraph(afterText, cursorPosition + 1);
@@ -449,38 +472,31 @@ export class TextParser {
     this.splitParagraphIntoLines(paragraphIndex + 1);
   }
 
-  public deleteTextInParagraph(position: number, length: number): void {
-    const paragraphIndex = this.findParagraphIndexAtOffset(position);
-    if (paragraphIndex === -1) return;
+  public mergeWithNextParagraph(paragraphIndex: number): void {
+    const currentParagraph = this.paragraphs[paragraphIndex];
+    const nextParagraph = this.paragraphs[paragraphIndex + 1];
+    if (!nextParagraph) return; // No next paragraph to merge with
 
-    const paragraph = this.paragraphs[paragraphIndex];
-    const newText = this.pieceTable.getRangeText(paragraph.offset, paragraph.length - length);
+    // Remove the next paragraph from the array
+    this.paragraphs.splice(paragraphIndex + 1, 1);
 
-    paragraph.updateText(newText);
-    paragraph.updateLength(-length);
+    // Calculate the new combined length (subtracting 1 for the removed newline)
+    const newLength = currentParagraph.length + nextParagraph.length - 1;
 
-    // Shift offsets for subsequent paragraphs
+    // Get the text of the new combined paragraph from the piece table
+    const text = this.pieceTable.getRangeText(currentParagraph.offset, newLength);
+
+    // Update the current paragraph with the merged content
+    currentParagraph.updateText(text, false);
+    currentParagraph.setLength(newLength);
+
+    // Shift offsets for all subsequent paragraphs (-1 for the removed newline)
     for (let i = paragraphIndex + 1; i < this.paragraphs.length; i++) {
-      this.paragraphs[i].shiftOffset(-length);
+      this.paragraphs[i].shiftOffset(-1);
     }
 
-    // Only reparse the affected paragraph
+    // Re-parse the merged paragraph into lines since its content changed
     this.splitParagraphIntoLines(paragraphIndex);
-  }
-
-  public optimizedDelete(position: number, length: number): void {
-    // Get the text being deleted to check if it contains newlines
-    const deletedText = this.pieceTable.getRangeText(position, length);
-
-    if (deletedText.includes('\n')) {
-      // Complex case: deleting across paragraphs or multiple newlines
-      // For now, fall back to full reparse, but this could be optimized further
-      this.splitIntoParagraphs();
-      this.splitAllParagraphsIntoLines();
-    } else {
-      // Simple case: deleting within a paragraph
-      this.deleteTextInParagraph(position, length);
-    }
   }
 
   public getParagraph(index: number): Paragraph | null {

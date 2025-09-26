@@ -121,7 +121,7 @@ export class Editor {
     this.debugConfig = {
       showWordOffsets: false,
       showLineInfo: false,
-      showParagraphBounds: false,
+      showParagraphBounds: true,
       showCursor: true,
       wordDisplayMode: 'charOffset',
       logging: {
@@ -140,9 +140,8 @@ export class Editor {
     this.pieceTable = new PieceTable(initialText, this.logger);
 
     // Initialize text renderer and input manager
+    this.paragraphStylesManager = new ParagraphStylesManager();
     this.textParser = new TextParser(this.pieceTable, ctx, this);
-
-    this.paragraphStylesManager = new ParagraphStylesManager(this.textParser);
 
     this.textRenderer = new TextRenderer(this.textParser, this);
     this.pdfRenderer = new PDFRenderer(this.textParser, this);
@@ -217,6 +216,7 @@ export class Editor {
   startSelection(mousePosition: MousePosition): void {
     this.selectionManager.startSelection(mousePosition);
     this.renderPages();
+    this.emitDebugUpdate();
   }
   updateSelection(mousePosition: MousePosition): void {
     this.selectionManager.updateSelection(mousePosition);
@@ -351,7 +351,7 @@ export class Editor {
 
   //TODO: this should also do partial reparsing, but we need to be carefull if we delete newlines
   deleteText(length: number): void {
-    // Handle selection deletion if there's a selection
+    // Case 1: If there's a selection, delete it
     const deletedRange = this.selectionManager.deleteSelection();
     if (deletedRange) {
       this.textParser.splitIntoParagraphs();
@@ -363,25 +363,27 @@ export class Editor {
       return;
     }
 
+    // Case 2: No selection, delete before cursor
     if (this.cursorManager.getPosition() > 0) {
+      const currentPos = this.cursorManager.getPosition();
+      const paragraphAtCursor = this.textParser.findParagraphIndexAtOffset(currentPos);
+
+      // 1. Styles update
       // Check if we are deleting a newline character
-      const charBefore = this.pieceTable.getRangeText(this.cursorManager.getPosition() - 1, 1);
+      const charBefore = this.pieceTable.getRangeText(currentPos - 1, 1);
       if (charBefore === '\n') {
         // Merging paragraphs, so update paragraph styles accordingly
-        this.paragraphStylesManager.mergeParagraphs(
-          this.textParser.findParagraphIndexAtOffset(this.cursorManager.getPosition()),
-        );
+        this.paragraphStylesManager.mergeWithNextParagraphStyle(paragraphAtCursor, this.textParser);
       }
 
-      this.pieceTable.delete(this.cursorManager.getPosition() - 1, length);
+      // 2. Text update
+      this.pieceTable.delete(currentPos - 1, length);
 
-      this.cursorManager.setCursorPosition(Math.max(0, this.cursorManager.getPosition() - length));
+      this.textParser.mergeWithNextParagraph(paragraphAtCursor);
 
-      this.textParser.splitIntoParagraphs();
-      this.textParser.splitAllParagraphsIntoLines();
       this.textParser.splitParagraphsIntoPages();
+      this.cursorManager.setCursorPosition(Math.max(0, currentPos - length));
 
-      this.cursorManager.mapLinearToStructure();
       this.renderPages();
       this.emitDebugUpdate();
     }
