@@ -90,7 +90,7 @@ const TextEditor = ({ exportHandlers, exportEventManager }: TextEditorProps = {}
       </div>
 
       {/* Debug panel positioned at bottom right */}
-      {editor && <DebugPanel editor={editor} />}
+      {/*       {editor && <DebugPanel editor={editor} />} */}
     </>
   );
 };

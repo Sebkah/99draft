@@ -1,5 +1,5 @@
-import { Editor } from "../Editor";
-import { TextParser } from "../TextParser";
+import { Editor } from '../Editor';
+import { TextParser } from '../TextParser';
 
 export class TextRenderer {
   private ctxs: (CanvasRenderingContext2D | null)[] = [];
@@ -304,6 +304,9 @@ export class TextRenderer {
 
     for (let i = page.startParagraphIndex; i <= page.endParagraphIndex; i++) {
       const paragraph = allParagraphs[i];
+      const marginLeft =
+        this.editor.paragraphStylesManager.getParagraphStyles(i).marginLeft ??
+        this.editor.margins.left;
 
       // Safety check: Skip if paragraph is undefined (can happen during text deletion)
       if (!paragraph || !paragraph.lines) {
@@ -321,7 +324,7 @@ export class TextRenderer {
         }
 
         // Render cursor if it's in the current line and on the current page
-        this.renderCursor(ctx, pageIndex, i, lindex, leftMargin, lineHeight);
+        this.renderCursor(ctx, pageIndex, i, lindex, marginLeft, lineHeight);
 
         if (this.justifyText) {
           const lineLenghtRest = this.editor.wrappingWidth - line.pixelLength;
@@ -334,7 +337,7 @@ export class TextRenderer {
         }
 
         ctx.translate(0, lineHeight);
-        this.renderLine(ctx, line.text, leftMargin, 0);
+        this.renderLine(ctx, line.text, marginLeft, 0);
       });
     }
 

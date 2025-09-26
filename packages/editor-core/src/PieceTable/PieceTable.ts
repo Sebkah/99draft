@@ -125,10 +125,15 @@ export class PieceTable {
   }
 
   public getRangeText(start: number, length: number): string {
+    // Handle the common case of length 0 (empty range)
+    if (length === 0) {
+      return '';
+    }
+
     const end = Math.min(start + length, this.documentLength);
     if (
       start < 0 ||
-      length <= 0 ||
+      length < 0 ||
       start >= this.documentLength ||
       start >= end ||
       end > this.documentLength

@@ -425,11 +425,14 @@ export class TextParser {
    * @see {@link TextParser.splitIntoParagraphs}
    */
   public findParagraphIndexAtOffset(offset: number): number {
+    // Use the same logic as CursorManager.mapLinearToStructure for consistency
     for (let i = 0; i < this.paragraphs.length; i++) {
       const paragraph = this.paragraphs[i];
-      // Each paragraph owns [offset, offset + length + 1)
-      // The +1 ensures newline positions belong to the preceding paragraph
-      if (offset >= paragraph.offset && offset <= paragraph.offset + paragraph.length + 1) {
+
+      const isOffsetInParagraph =
+        offset >= paragraph.offset && offset < paragraph.offset + paragraph.length + 1;
+
+      if (isOffsetInParagraph) {
         return i;
       }
     }
@@ -450,13 +453,19 @@ export class TextParser {
 
     // Split the paragraph text
     const beforeText = fullParagraphText.substring(0, splitPosition);
-    const afterText = fullParagraphText.substring(splitPosition);
+    let afterText = fullParagraphText.substring(splitPosition);
+
+    // Remove the newline character from the beginning of afterText if it exists
+    // This ensures paragraphs don't start with newlines (consistent with splitIntoParagraphs logic)
+    if (afterText.startsWith('\n')) {
+      afterText = afterText.substring(1);
+    }
 
     // Update the current paragraph with the "before" text
     currentParagraph.updateText(beforeText, false);
     currentParagraph.adjustLength(beforeText.length - currentParagraph.length);
 
-    // Create new paragraph with the "after" text
+    // Create new paragraph with the "after" text (without leading newline)
     const newParagraph = new Paragraph(afterText, cursorPosition + 1);
 
     // Insert the new paragraph after the current one
@@ -480,15 +489,17 @@ export class TextParser {
     // Remove the next paragraph from the array
     this.paragraphs.splice(paragraphIndex + 1, 1);
 
-    // Calculate the new combined length (subtracting 1 for the removed newline)
-    const newLength = currentParagraph.length + nextParagraph.length - 1;
+    // Calculate the new combined length
+    // When merging paragraphs, we subtract 1 for the removed newline character
+    // but ensure the result is never negative (for empty paragraphs)
+    const newLength = Math.max(0, currentParagraph.length + nextParagraph.length);
 
     // Get the text of the new combined paragraph from the piece table
-    const text = this.pieceTable.getRangeText(currentParagraph.offset, newLength);
+    const text =
+      newLength > 0 ? this.pieceTable.getRangeText(currentParagraph.offset, newLength) : '';
 
     // Update the current paragraph with the merged content
-    currentParagraph.updateText(text, false);
-    currentParagraph.setLength(newLength);
+    currentParagraph.updateText(text, true);
 
     // Shift offsets for all subsequent paragraphs (-1 for the removed newline)
     for (let i = paragraphIndex + 1; i < this.paragraphs.length; i++) {

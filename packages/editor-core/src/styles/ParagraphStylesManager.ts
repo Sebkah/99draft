@@ -11,8 +11,7 @@ export class ParagraphStylesManager {
   private styles: ParagraphStyle[] = [
     {
       marginLeft: 0,
-      marginRight: 0,
-
+      marginRight: 40,
       lineHeight: 1.2,
     },
     {
@@ -32,7 +31,7 @@ export class ParagraphStylesManager {
   }
 
   getParagraphStyles(paragraphIndex: number): ParagraphStyle {
-    return this.styles[paragraphIndex] || [];
+    return this.styles[paragraphIndex] || { marginLeft: 0, marginRight: 0, lineHeight: 1.2 };
   }
 
   setParagraphStyles(paragraphIndex: number, styles: ParagraphStyle) {

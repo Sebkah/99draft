@@ -118,7 +118,6 @@ export class CursorManager {
       // If the cursor is in the paragraph, set the index of the paragraph and break the loop
       if (isCursorInParagraph) {
         paragraphIndex = i;
-
         break;
       }
     }
@@ -201,8 +200,7 @@ export class CursorManager {
     moveCursor: boolean = true,
   ): StructurePosition | undefined {
     const lineHeight = 20; // Height of each line
-    const leftMargin = this.editor.margins.left; // Left margin for the text
-    const adjustedX = x - leftMargin; // Adjust x for left margin
+
     const clickedLineInPage = Math.floor((y - this.editor.margins.top) / lineHeight);
 
     const page = this.textParser.getPages()[pageIndex];
@@ -216,6 +214,13 @@ export class CursorManager {
 
     for (let pIndex = startParagraphIndex; pIndex <= endParagraphIndex; pIndex++) {
       const paragraph = paragraphs[pIndex];
+
+      // Paragraph margin
+      const marginLeft =
+        this.editor.paragraphStylesManager.getParagraphStyles(pIndex).marginLeft ??
+        this.editor.margins.left;
+      const adjustedX = x - marginLeft; // Adjust x for paragraph margin
+
       if (!paragraph) continue;
 
       // Determine which lines of this paragraph are in this page
@@ -347,8 +352,26 @@ export class CursorManager {
     if (!line.text || line.text.length === 0) {
       const newPos = targetParagraph.offset + line.offset;
       if (moveCursor) {
+        // Find the correct page for this empty line
+        const pages = this.textParser.getPages();
+        let newPageIndex = -1;
+
+        for (let p = 0; p < pages.length; p++) {
+          const page = pages[p];
+          if (page.containsLine(targetParagraphIndex, targetLine)) {
+            newPageIndex = p;
+            break;
+          }
+        }
+
+        // Fallback to current page if not found (shouldn't happen)
+        if (newPageIndex === -1) {
+          newPageIndex = this.structurePosition.pageIndex;
+          console.warn('Empty line: Could not find page, using current page');
+        }
+
         this.structurePosition = {
-          pageIndex: this.structurePosition.pageIndex, // Preserve current page
+          pageIndex: newPageIndex,
           paragraphIndex: targetParagraphIndex,
           lineIndex: targetLine,
           characterIndex: 0,
@@ -410,12 +433,46 @@ export class CursorManager {
     if (moveCursor) {
       // Calculate the page index for the new position
       const pages = this.textParser.getPages();
-      let newPageIndex = this.structurePosition.pageIndex; // Default to current page
+      let newPageIndex = -1; // Start with invalid page to detect if we find one
+
       for (let p = 0; p < pages.length; p++) {
         const page = pages[p];
         if (page.containsLine(targetParagraphIndex, targetLine)) {
           newPageIndex = p;
           break;
+        }
+      }
+
+      // If no page was found, log error and try to find the correct page
+      if (newPageIndex === -1) {
+        console.error(
+          'Cursor movement: Could not find page for paragraph',
+          targetParagraphIndex,
+          'line',
+          targetLine,
+        );
+        console.error('Available pages:', pages.length);
+        console.error('Current position:', this.structurePosition);
+
+        // Fallback: find the page that contains this paragraph
+        for (let p = 0; p < pages.length; p++) {
+          const page = pages[p];
+          if (page.containsParagraph(targetParagraphIndex)) {
+            newPageIndex = p;
+            console.warn(
+              'Fallback: Using page',
+              p,
+              'which contains paragraph',
+              targetParagraphIndex,
+            );
+            break;
+          }
+        }
+
+        // Last resort: use current page
+        if (newPageIndex === -1) {
+          newPageIndex = this.structurePosition.pageIndex;
+          console.warn('Last resort: Using current page index', newPageIndex);
         }
       }
 
