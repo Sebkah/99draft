@@ -1,5 +1,4 @@
 import { Editor } from '..';
-import { TextParser } from '../core/TextParser';
 
 export type ParagraphStyle = {
   marginLeft?: number;
@@ -10,10 +9,10 @@ export type ParagraphStyle = {
 
 export class ParagraphStylesManager {
   private editor: Editor;
-  private styles: ParagraphStyle[] = [
-    /*  {
-      marginLeft: 0,
-      marginRight: 40,
+  styles: ParagraphStyle[] = [
+    {
+      marginLeft: 45,
+      marginRight: 20,
       lineHeight: 1.2,
     },
     {
@@ -25,7 +24,7 @@ export class ParagraphStylesManager {
       marginLeft: 20,
       marginRight: 300,
       lineHeight: 1.5,
-    }, */
+    },
   ];
 
   constructor(editor: Editor, $styles?: ParagraphStyle[]) {
@@ -54,15 +53,20 @@ export class ParagraphStylesManager {
   /**
    * Merge paragraph styles by removing the next paragraph's style or the current empty one.
    */
-  mergeWithNextParagraphStyle(paragraphIndex: number, _textParser: TextParser) {
+  mergeWithNextParagraphStyle(paragraphIndex: number, isParagraphEmpty: boolean) {
     // If the text of the paragraph is empty (just a newline)
-    if (_textParser.getParagraph(paragraphIndex)?.text === '') {
+
+    if (isParagraphEmpty) {
+      console.log('Merging styles for empty paragraph at index', paragraphIndex);
       // Remove the styles of the empty paragraph
       this.styles.splice(paragraphIndex, 1);
       return;
     }
 
+    // Otherwise, remove the next paragraph's styles to merge into the current one
+
     if (paragraphIndex < this.styles.length - 1) {
+      console.log('Merging styles with next paragraph at index', paragraphIndex);
       this.styles.splice(paragraphIndex + 1, 1);
     }
   }

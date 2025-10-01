@@ -242,6 +242,20 @@ export class Editor {
     this.updateMargins();
   }
 
+  setMarginsForCurrentParagraph(marginLeft: number, marginRight: number): void {
+    const { paragraphIndex } = this.cursorManager.structurePosition;
+
+    console.log(this.paragraphStylesManager.styles);
+    this.paragraphStylesManager.setParagraphStyles(paragraphIndex, { marginLeft, marginRight });
+
+    this.textParser.splitParagraphIntoLines(paragraphIndex);
+
+    this.textParser.splitParagraphsIntoPages();
+
+    this.cursorManager.mapLinearToStructure();
+    this.renderPages();
+  }
+
   /**
    * Update the margins using stored values and canvas reference
    * @param leftMargin - Optional left margin override
@@ -331,6 +345,7 @@ export class Editor {
 
     this.pieceTable.insert('\n', currentPosition);
     this.textParser.splitParagraphDirectly(currentPosition);
+
     this.cursorManager.moveRight(1);
   }
 

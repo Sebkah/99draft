@@ -519,6 +519,9 @@ export class TextParser {
       this.paragraphs[i].shiftOffset(1);
     }
 
+    // Split the styles before so the line splitting can use the correct styles (margins)
+    this.paragraphStylesManager.splitParagraph(paragraphIndex);
+
     // Only reparse the affected paragraphs into lines
     this.splitParagraphIntoLines(paragraphIndex);
     this.splitParagraphIntoLines(paragraphIndex + 1);
@@ -539,6 +542,7 @@ export class TextParser {
     const beforeParagraphIndex = this.findParagraphIndexAtOffset(lineBreakPosition);
 
     const beforeParagraph = this.paragraphs[beforeParagraphIndex];
+    const oldText = beforeParagraph ? beforeParagraph.text : '';
 
     // Check we're not at the end of the document (no next paragraph to merge with)
     if (beforeParagraphIndex === -1 || beforeParagraphIndex === this.paragraphs.length - 1) {
@@ -566,6 +570,11 @@ export class TextParser {
     for (let i = beforeParagraphIndex + 1; i < this.paragraphs.length; i++) {
       this.paragraphs[i].shiftOffset(-1);
     }
+
+    const isParagraphEmpty = oldText === '';
+
+    // Merge the styles of the two paragraphs
+    this.paragraphStylesManager.mergeWithNextParagraphStyle(beforeParagraphIndex, isParagraphEmpty);
 
     // Re-parse the merged paragraph into lines since its content changed
     this.splitParagraphIntoLines(beforeParagraphIndex);

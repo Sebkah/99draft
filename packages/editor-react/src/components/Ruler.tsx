@@ -72,13 +72,13 @@ const Ruler: React.FC<RulerProps> = ({ width, editor }) => {
         const maxLeft = width - rightMargin - minGap;
         const newLeft = Math.max(0, Math.min(pos, maxLeft));
         setLeftMargin(newLeft);
-        editor.setMargins(newLeft, rightMargin);
+        editor.setMarginsForCurrentParagraph(newLeft, rightMargin);
       } else if (dragging === 'right') {
         // rightMargin is distance from right edge. newRight must be <= width - leftMargin - minGap
         const maxRight = width - leftMargin - minGap;
         const newRight = Math.max(0, Math.min(rightPos, maxRight));
         setRightMargin(newRight);
-        editor.setMargins(leftMargin, newRight);
+        editor.setMarginsForCurrentParagraph(leftMargin, newRight);
       }
     },
     [dragging, getPositionFromEvent, leftMargin, rightMargin, width, editor],
