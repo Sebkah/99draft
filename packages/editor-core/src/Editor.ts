@@ -330,13 +330,14 @@ export class Editor {
       return;
     }
 
-    this.pieceTable.insert(text, this.cursorManager.getPosition());
-    this.textParser.reparseParagraph(this.cursorManager.getPosition(), text.length);
-    this.cursorManager.setCursorPosition(
-      Math.min(this.pieceTable.length, this.cursorManager.getPosition() + text.length),
-    );
+    const cursorPosition = this.cursorManager.getPosition();
 
+    this.pieceTable.insert(text, cursorPosition);
+    this.textParser.reparseParagraph(cursorPosition, text.length);
+  
     this.textParser.splitParagraphsIntoPages();
+
+    this.cursorManager.moveRight(text.length);
 
     this.renderPages();
     this.emitDebugUpdate();
@@ -367,11 +368,10 @@ export class Editor {
       }
 
       const paragraphAtCursor = this.textParser.findParagraphIndexAtOffset(currentPos);
-   
 
       // Check if we are deleting a newline character
       const charBefore = this.pieceTable.getRangeText(currentPos - 1, 1);
-   
+
       // Delete the text first
       this.pieceTable.delete(currentPos - 1, length);
 
@@ -423,9 +423,6 @@ export class Editor {
     }
 
     const currentPosition = this.cursorManager.getPosition();
-
-    // Insert the newline character
-    this.pieceTable.insert('\n', currentPosition);
 
     // Split paragraph at the position
     this.textParser.splitParagraphDirectly(currentPosition);

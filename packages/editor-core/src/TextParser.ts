@@ -230,8 +230,10 @@ export class TextParser {
     const paragraph = this.paragraphs[paragraphIndex];
     if (!paragraph) return;
 
-    // Update paragraph length
-    paragraph.updateText(this.pieceTable.getRangeText(paragraph.offset, paragraph.length));
+    // Update paragraph 
+    paragraph.updateText(
+      this.pieceTable.getRangeText(paragraph.offset, paragraph.length + editLength),
+    );
     paragraph.adjustLength(editLength);
 
     // Shift offsets for all subsequent paragraphs
@@ -467,6 +469,9 @@ export class TextParser {
     //    paragraphs and the offset of the second paragraph.
     // - getRangeText(start, length) retrieves text from the piece table, where length is inclusive.
 
+    // Insert the newline character
+    this.pieceTable.insert('\n', cursorPosition);
+
     const paragraphIndex = this.findParagraphIndexAtOffset(cursorPosition);
 
     const currentParagraph = this.paragraphs[paragraphIndex];
@@ -483,18 +488,19 @@ export class TextParser {
     // First part from start of paragraph up to the cursor (which is before the linebreak)
     const firstPartText = this.pieceTable.getRangeText(currentParagraph.offset, offsetInParagraph);
 
-    // Update the current paragraph with the first part of the text
-    currentParagraph.updateText(firstPartText);
-    currentParagraph.setLength(Math.max(0, firstPartText.length + 1)); // +1 for the newline just added
-
     // Second part from just after the linebreak (because we don't insert it into text) to the end of the paragraph
     const secondPartText = this.pieceTable.getRangeText(
       cursorPosition + 1,
       currentParagraph.length - offsetInParagraph - 1, //   Why -1? Original length includes the paragraph's trailing newline.
     );
 
-    // New paragraph with the second part of the text
-    const newParagraph = new Paragraph(secondPartText, cursorPosition + 1); // the offset is cursorPosition + 1 to account for the newline
+    // It's important to to update after getting the texts, because updating the paragraph text
+    // changes its length and would mess up the offsets for the second part.
+    currentParagraph.updateText(firstPartText);
+    currentParagraph.setLength(Math.max(0, firstPartText.length + 1)); // +1 for the newline just added
+
+    // New paragraph with the second part of the text, the offset is cursorPosition + 1 to account for the newline
+    const newParagraph = new Paragraph(secondPartText, cursorPosition + 1);
     newParagraph.setLength(secondPartText.length + 1); // +1 for the already existing newline
 
     // Insert the new paragraph into the array right after the current one
