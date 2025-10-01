@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useLayoutEffect } from 'react';
-import { Editor } from '@99draft/editor-core';
+import { Editor, PageCountChangeEvent } from '@99draft/editor-core';
 import Page from './Page';
 
 export type PagesProps = {
@@ -15,12 +15,12 @@ const Pages = ({ editor, canvasRefs }: PagesProps) => {
   // Manage page count state internally
   const [numberOfPages, setNumberOfPages] = useState<number>(1);
 
-  // Set up page count change callback
+  // Set up page count change event listener
   useEffect(() => {
     if (!editor) return;
 
-    editor.setPageCountChangeCallback((newPageCount) => {
-      setNumberOfPages(newPageCount);
+    const unsubscribe = editor.on('pageCountChange', (event: PageCountChangeEvent) => {
+      setNumberOfPages(event.pageCount);
     });
 
     // Set initial page count
@@ -28,8 +28,8 @@ const Pages = ({ editor, canvasRefs }: PagesProps) => {
     setNumberOfPages(initialPageCount);
 
     return () => {
-      // Clean up callback on unmount - set to empty function
-      editor.setPageCountChangeCallback(() => {});
+      // Clean up event listener on unmount
+      unsubscribe();
     };
   }, [editor]);
 

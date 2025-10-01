@@ -1,6 +1,12 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { motion } from 'motion/react';
-import { Editor, PieceDebug, DebugConfig, StructurePosition } from '@99draft/editor-core';
+import {
+  Editor,
+  PieceDebug,
+  DebugConfig,
+  StructurePosition,
+  DebugUpdateEvent,
+} from '@99draft/editor-core';
 
 type Props = {
   editor: Editor;
@@ -24,16 +30,28 @@ const DebugPanel: React.FC<Props> = ({ editor }) => {
   const [debugConfig, setDebugConfig] = useState<DebugConfig>({ ...editor.debugConfig });
 
   useEffect(() => {
-    editor.setDebugUpdateCallback((newPieces) => {
-      setPieces(newPieces);
+    const unsubscribeDebug = editor.on('debugUpdate', (event: DebugUpdateEvent) => {
+      setPieces(event.pieces);
       setCursor({
         pos: editor.cursorManager.getPosition(),
         structure: editor.cursorManager.structurePosition ?? null,
       });
     });
+
+    // Also listen to cursor changes to update cursor info
+    const unsubscribeCursor = editor.cursorManager.on('cursorChange', () => {
+      setCursor({
+        pos: editor.cursorManager.getPosition(),
+        structure: editor.cursorManager.structurePosition ?? null,
+      });
+    });
+
+    // Trigger initial debug update
+    editor.emitDebugUpdate();
+
     return () => {
-      // Clear the subscription with a noop to avoid stale callbacks
-      editor.setDebugUpdateCallback(() => {});
+      unsubscribeDebug();
+      unsubscribeCursor();
     };
   }, [editor]);
 

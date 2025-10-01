@@ -19,6 +19,13 @@ export { CursorManager } from './managers/CursorManager';
 export type { MousePosition, StructurePosition } from './managers/CursorManager';
 export { SelectionManager } from './managers/SelectionManager';
 
+// Event system
+export { EventEmitter } from './utils/EventEmitter';
+export type { EventMap } from './utils/EventEmitter';
+export type { CursorChangeEvent, CursorManagerEvents } from './types/CursorEvents';
+export type { DebugUpdateEvent, PageCountChangeEvent, EditorEvents } from './types/EditorEvents';
+export type { TextParserEvents } from './types/TextParserEvents';
+
 // Input handling
 export { InputManager } from './managers/InputManager';
 

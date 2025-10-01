@@ -23,7 +23,20 @@ const Ruler: React.FC<RulerProps> = ({ width, editor }) => {
   const [dragging, setDragging] = useState<'left' | 'right' | null>(null);
   const rulerRef = useRef<HTMLDivElement>(null);
 
+  useEffect(() => {
+    const unsubscribe = editor.cursorManager.on('cursorChange', (event) => {
+      const { marginLeft, marginRight } = editor.paragraphStylesManager.getParagraphStyles(
+        event.structurePosition.paragraphIndex,
+      );
+      if (marginLeft) setLeftMargin(marginLeft);
 
+      if (marginRight) setRightMargin(marginRight);
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, []);
 
   /**
    * Calculate position from mouse event relative to ruler

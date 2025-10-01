@@ -7,6 +7,8 @@ import { SelectionManager } from '../managers/SelectionManager';
 import { createEditorLogger, type EditorLogger } from '../managers/EditorLogger';
 import { TextRenderer, PDFRenderer, DOCXRenderer } from '..';
 import { ParagraphStylesManager } from '../styles/ParagraphStylesManager';
+import { EventEmitter } from '../utils/EventEmitter';
+import type { EditorEvents, DebugUpdateEvent } from '../types/EditorEvents';
 
 /**
  * Type definition for debugging piece table structure
@@ -61,7 +63,7 @@ type Margins = {
  * Internal subsystems are kept private to maintain consistency and proper coordination.
  * Use the public managers for direct access to cursor/selection functionality.
  */
-export class Editor {
+export class Editor extends EventEmitter<EditorEvents> {
   private pieceTable: PieceTable;
   private textRenderer: TextRenderer;
   private pdfRenderer: PDFRenderer;
@@ -84,7 +86,6 @@ export class Editor {
   public logger: EditorLogger;
 
   public internalCanvas: HTMLCanvasElement;
-  private debugUpdateCallback?: (pieces: PieceDebug[]) => void;
 
   public get numberOfPages(): number {
     return this.textParser.getPages().length;
@@ -100,6 +101,7 @@ export class Editor {
   }
 
   constructor(initialText: string, margins: Margins, width: number, height: number) {
+    super();
     // Initialize an internal canvas for offscreen measurements if needed
     this.internalCanvas = document.createElement('canvas');
     this.internalCanvas.width = width;
@@ -158,6 +160,11 @@ export class Editor {
       },
     ]);
     this.textParser = new TextParser(this.pieceTable, ctx, this);
+
+    // Forward TextParser events as Editor events
+    this.textParser.on('pageCountChange', (event) => {
+      this.emit('pageCountChange', event);
+    });
 
     this.textRenderer = new TextRenderer(this.textParser, this);
     this.pdfRenderer = new PDFRenderer(this.textParser, this);
@@ -236,15 +243,6 @@ export class Editor {
   endSelection(mousePosition: MousePosition): void {
     this.selectionManager.endSelection(mousePosition);
     this.renderPages();
-  }
-
-  /**
-   * Set a callback to be called when the number of pages changes
-   * @param callback - Function to call when page count changes
-   */
-  setPageCountChangeCallback(callback: (pageCount: number) => void): void {
-    // Delegate to TextParser which is responsible for page management
-    this.textParser.setPageCountChangeCallback(callback);
   }
 
   /**
@@ -512,21 +510,11 @@ export class Editor {
   }
 
   /**
-   * Start debug information updates (triggered on input changes)
-   * @param callback - Function to call with updated debug information
-   */
-  setDebugUpdateCallback(callback: (pieces: PieceDebug[]) => void): void {
-    this.debugUpdateCallback = callback;
-    // Trigger initial update
-    this.emitDebugUpdate();
-  }
-
-  /**
    * Trigger debug information update immediately
+   * Emits 'debugUpdate' event with current piece table state
    */
   public emitDebugUpdate(): void {
-    if (this.debugUpdateCallback) {
-      /*  console.log('Triggering debug update'); */
+    if (this.hasListeners('debugUpdate')) {
       const pieces = this.pieceTable.getPieces().map((piece) => {
         // Extract text from appropriate buffer based on piece source
         if (piece.source === 'original') {
@@ -542,7 +530,9 @@ export class Editor {
           text: this.pieceTable.getAddBuffer().substring(piece.offset, piece.offset + piece.length),
         };
       });
-      this.debugUpdateCallback(pieces);
+
+      const event: DebugUpdateEvent = { pieces };
+      this.emit('debugUpdate', event);
     }
   }
 

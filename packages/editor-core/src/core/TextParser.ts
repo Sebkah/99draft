@@ -2,6 +2,8 @@ import { Editor } from './Editor';
 import { PieceTable } from '../pieceTable/PieceTable';
 import { Paragraph } from '../models/Paragraph';
 import { Page } from '../models/Page';
+import { EventEmitter } from '../utils/EventEmitter';
+import type { TextParserEvents, PageCountChangeEvent } from '../types/TextParserEvents';
 
 /**
  * Represents a line of text with associated metadata.
@@ -29,7 +31,7 @@ export type Line = {
   wordCharOffsets: number[];
 };
 
-export class TextParser {
+export class TextParser extends EventEmitter<TextParserEvents> {
   private pieceTable: PieceTable;
   private paragraphs: Paragraph[] = [];
   private ctx: CanvasRenderingContext2D;
@@ -39,13 +41,13 @@ export class TextParser {
   private lastPageCount: number = 0;
 
   private paragraphStylesManager;
-  private pageCountChangeCallback?: (pageCount: number) => void;
 
   public getPages(): Page[] {
     return this.pages;
   }
 
   constructor(pieceTable: PieceTable, ctx: CanvasRenderingContext2D, editor: Editor) {
+    super();
     this.pieceTable = pieceTable;
     this.ctx = ctx;
     this.editor = editor;
@@ -60,29 +62,25 @@ export class TextParser {
   }
 
   /**
-   * Set a callback to be called when the number of pages changes
-   * @param callback - Function to call when page count changes
-   */
-  setPageCountChangeCallback(callback: (pageCount: number) => void): void {
-    this.pageCountChangeCallback = callback;
-  }
-
-  /**
-   * Notify about page count changes
+   * Notify about page count changes by emitting events
    */
   private notifyPageCountChange(): void {
-    if (this.pageCountChangeCallback) {
-      const currentPageCount = this.pages.length;
-      if (this.lastPageCount !== currentPageCount) {
-        this.editor.logger.pageManagement(
-          'Page count changed:',
-          this.lastPageCount,
-          '->',
-          currentPageCount,
-        );
-        this.lastPageCount = currentPageCount;
-        this.pageCountChangeCallback(currentPageCount);
-      }
+    const currentPageCount = this.pages.length;
+    if (this.lastPageCount !== currentPageCount) {
+      this.editor.logger.pageManagement(
+        'Page count changed:',
+        this.lastPageCount,
+        '->',
+        currentPageCount,
+      );
+
+      const event: PageCountChangeEvent = {
+        pageCount: currentPageCount,
+        previousPageCount: this.lastPageCount,
+      };
+
+      this.lastPageCount = currentPageCount;
+      this.emit('pageCountChange', event);
     }
   }
 
@@ -299,9 +297,6 @@ export class TextParser {
 
   // Split a paragraph into lines based on the canvas width
   public splitParagraphIntoLines(paragraphIndex: number): void {
-    // Log entry with stack trace for debugging paragraph splitting.
-    // Use Error().stack to capture a readable stack trace alongside the index.
-    console.log(this.paragraphStylesManager.styles);
     const paragraph = this.paragraphs[paragraphIndex];
 
     // Ensure canvas context has correct font for measurements

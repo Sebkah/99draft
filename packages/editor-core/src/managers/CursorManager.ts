@@ -1,5 +1,7 @@
 import { Editor } from '../core/Editor';
 import { TextParser } from '../core/TextParser';
+import { EventEmitter } from '../utils/EventEmitter';
+import type { CursorManagerEvents, CursorChangeEvent } from '../types/CursorEvents';
 
 // Forward declaration to avoid circular dependency
 class SelectionManager {}
@@ -18,7 +20,7 @@ export type MousePosition = {
   page: number;
 };
 
-export class CursorManager {
+export class CursorManager extends EventEmitter<CursorManagerEvents> {
   // Manages cursor position and movement within the editor
   private textParser: TextParser;
   private linearPosition: number;
@@ -40,6 +42,7 @@ export class CursorManager {
     ctx: CanvasRenderingContext2D,
     editor: Editor,
   ) {
+    super();
     this.linearPosition = initialPosition;
     this.textParser = textParser;
     this.editor = editor;
@@ -56,19 +59,26 @@ export class CursorManager {
   }
 
   public setCursorPosition(position: number): void {
-    const clampedPosition = this.clampLinearPosition(position); //ugly, find a solution
+    const previousPosition = this.linearPosition;
+    const clampedPosition = this.clampLinearPosition(position);
 
-    // Log the character at the clamped position as a JSON string for safer inspection
+    // Only update and emit if position actually changed
+    if (clampedPosition !== previousPosition) {
+      this.linearPosition = clampedPosition;
+      this.mapLinearToStructure();
 
-    this.linearPosition = clampedPosition;
+      // Emit cursor change event
+      const event: CursorChangeEvent = {
+        position: clampedPosition,
+        structurePosition: { ...this.structurePosition },
+        previousPosition: previousPosition,
+      };
+      this.emit('cursorChange', event);
 
-    this.mapLinearToStructure();
-
-    /*     console.log('Cursor moved to paragraph:', this.structurePosition.paragraphIndex); */
-
-    // Clear selection when cursor moves
-    if (this.selectionManager) {
-      (this.selectionManager as any).clearSelection();
+      // Clear selection when cursor moves
+      if (this.selectionManager) {
+        (this.selectionManager as any).clearSelection();
+      }
     }
   }
 
@@ -89,13 +99,13 @@ export class CursorManager {
     if (this.selectionManager && (this.selectionManager as any).handleMoveRightWithSelection()) {
       return;
     }
-
     this.setCursorPosition(this.linearPosition + amount);
   }
 
   public moveUp(): void {
     this.getLineAdjacentLinearPosition(this.linearPosition, 'above', true);
   }
+
   public moveDown(): void {
     this.getLineAdjacentLinearPosition(this.linearPosition, 'below', true);
   }
@@ -268,6 +278,7 @@ export class CursorManager {
         };
 
         if (moveCursor) {
+          const previousPosition = this.linearPosition;
           this.structurePosition = proposed;
           this.linearPosition = this.mapStructureToLinear({
             pageIndex: pageIndex,
@@ -275,6 +286,16 @@ export class CursorManager {
             lineIndex: lineInParagraph,
             characterIndex: charIndex,
           });
+
+          // Emit events if position changed
+          if (this.linearPosition !== previousPosition) {
+            const event: CursorChangeEvent = {
+              position: this.linearPosition,
+              structurePosition: { ...this.structurePosition },
+              previousPosition: previousPosition,
+            };
+            this.emit('cursorChange', event);
+          }
         }
         return proposed;
       }
@@ -374,6 +395,7 @@ export class CursorManager {
           console.warn('Empty line: Could not find page, using current page');
         }
 
+        const previousPosition = this.linearPosition;
         this.structurePosition = {
           pageIndex: newPageIndex,
           paragraphIndex: targetParagraphIndex,
@@ -382,6 +404,16 @@ export class CursorManager {
           pixelOffsetInLine: 0,
         };
         this.linearPosition = newPos;
+
+        // Emit events if position changed
+        if (this.linearPosition !== previousPosition) {
+          const event: CursorChangeEvent = {
+            position: this.linearPosition,
+            structurePosition: { ...this.structurePosition },
+            previousPosition: previousPosition,
+          };
+          this.emit('cursorChange', event);
+        }
       }
       return newPos;
     }
@@ -488,6 +520,7 @@ export class CursorManager {
       // log line text
       console.log('Line text:', JSON.stringify(line.text));
 
+      const previousPosition = this.linearPosition;
       this.structurePosition = {
         pageIndex: newPageIndex,
         paragraphIndex: targetParagraphIndex,
@@ -496,6 +529,16 @@ export class CursorManager {
         pixelOffsetInLine: finalPixelOffset,
       };
       this.linearPosition = newPos;
+
+      // Emit events if position changed
+      if (this.linearPosition !== previousPosition) {
+        const event: CursorChangeEvent = {
+          position: this.linearPosition,
+          structurePosition: { ...this.structurePosition },
+          previousPosition: previousPosition,
+        };
+        this.emit('cursorChange', event);
+      }
     }
     return newPos;
   }
