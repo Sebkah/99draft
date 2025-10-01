@@ -1,5 +1,5 @@
 import { Editor } from '..';
-import { TextParser } from '../TextParser';
+import { TextParser } from '../core/TextParser';
 
 export type ParagraphStyle = {
   marginLeft?: number;

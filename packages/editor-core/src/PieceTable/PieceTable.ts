@@ -1,4 +1,4 @@
-import type { EditorLogger } from '../EditorLogger';
+import type { EditorLogger } from '../managers/EditorLogger';
 
 /**
  * Represents a single, contiguous piece of text from one of the buffers.

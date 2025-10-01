@@ -1,5 +1,5 @@
-import { Editor } from './Editor';
-import { TextParser } from './TextParser';
+import { Editor } from '../core/Editor';
+import { TextParser } from '../core/TextParser';
 
 // Forward declaration to avoid circular dependency
 class SelectionManager {}

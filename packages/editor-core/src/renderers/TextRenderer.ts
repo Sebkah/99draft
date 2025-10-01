@@ -1,5 +1,5 @@
-import { Editor } from '../Editor';
-import { TextParser } from '../TextParser';
+import { Editor } from '../core/Editor';
+import { TextParser } from '../core/TextParser';
 
 export class TextRenderer {
   private ctxs: (CanvasRenderingContext2D | null)[] = [];
@@ -342,7 +342,7 @@ export class TextRenderer {
           const spaceCount = (line.text.match(/ /g) || []).length;
           const distributeSpace = spaceCount > 0 ? lineLenghtRest / spaceCount : 0;
 
-          if (distributeSpace < 10) {
+          if (distributeSpace < 20) {
             ctx.wordSpacing = distributeSpace + 'px';
           }
         }

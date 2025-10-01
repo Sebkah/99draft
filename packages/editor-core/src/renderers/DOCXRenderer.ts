@@ -1,8 +1,6 @@
-
 import { Document, Paragraph, TextRun, AlignmentType } from 'docx';
 import { Editor } from '..';
-import { TextParser } from '../TextParser';
-
+import { TextParser } from '../core/TextParser';
 
 /**
  * DOCXRenderer handles the generation of DOCX content for Word document export.

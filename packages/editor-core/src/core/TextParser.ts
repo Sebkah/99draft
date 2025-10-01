@@ -1,7 +1,7 @@
 import { Editor } from './Editor';
-import { PieceTable } from './PieceTable/PieceTable';
-import { Paragraph } from './Paragraph';
-import { Page } from './Page';
+import { PieceTable } from '../pieceTable/PieceTable';
+import { Paragraph } from '../models/Paragraph';
+import { Page } from '../models/Page';
 
 /**
  * Represents a line of text with associated metadata.
@@ -477,8 +477,6 @@ export class TextParser {
     // - We need to take both those points into consideration when splitting the text, updating the length of the
     //    paragraphs and the offset of the second paragraph.
     // - getRangeText(start, length) retrieves text from the piece table, where length is inclusive.
-
-
 
     const paragraphIndex = this.findParagraphIndexAtOffset(cursorPosition);
 

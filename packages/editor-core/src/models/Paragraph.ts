@@ -1,4 +1,4 @@
-import { Line } from './TextParser';
+import { Line } from '../core/TextParser';
 
 /**
  * Represents a paragraph of text with associated metadata and methods for manipulation.
@@ -39,7 +39,6 @@ export class Paragraph {
   // Utility methods
   public updateText(newText: string): void {
     this.paragraphText = newText;
-
   }
 
   public adjustLength(delta: number): void {

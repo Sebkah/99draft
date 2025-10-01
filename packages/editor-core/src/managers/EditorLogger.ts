@@ -1,4 +1,4 @@
-import type { DebugConfig } from './Editor';
+import type { DebugConfig } from '../core/Editor';
 
 /**
  * Debug logging categories for the Editor core

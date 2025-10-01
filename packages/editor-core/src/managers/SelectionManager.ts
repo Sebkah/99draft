@@ -1,4 +1,4 @@
-import { Editor } from './Editor';
+import { Editor } from '../core/Editor';
 import { CursorManager, MousePosition } from './CursorManager';
 
 /**
@@ -173,6 +173,4 @@ export class SelectionManager {
       };
     }
   }
-
-
 }

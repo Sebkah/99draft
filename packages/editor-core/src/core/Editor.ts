@@ -1,12 +1,12 @@
-import { PieceTable } from './PieceTable/PieceTable';
+import { PieceTable } from '../pieceTable/PieceTable';
 
-import { InputManager } from './Input/InputManager';
+import { InputManager } from '../managers/InputManager';
 import { TextParser } from './TextParser';
-import { CursorManager, MousePosition } from './CursorManager';
-import { SelectionManager } from './SelectionManager';
-import { createEditorLogger, type EditorLogger } from './EditorLogger';
-import { TextRenderer, PDFRenderer, DOCXRenderer } from '.';
-import { ParagraphStylesManager } from './styles/ParagraphStylesManager';
+import { CursorManager, MousePosition } from '../managers/CursorManager';
+import { SelectionManager } from '../managers/SelectionManager';
+import { createEditorLogger, type EditorLogger } from '../managers/EditorLogger';
+import { TextRenderer, PDFRenderer, DOCXRenderer } from '..';
+import { ParagraphStylesManager } from '../styles/ParagraphStylesManager';
 
 /**
  * Type definition for debugging piece table structure

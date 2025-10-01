@@ -1,5 +1,5 @@
-import { CursorManager } from '../CursorManager';
-import { Editor } from '../Editor';
+import { CursorManager } from './CursorManager';
+import { Editor } from '../core/Editor';
 
 /**
  * InputManager handles all keyboard input for text editing operations
