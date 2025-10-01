@@ -299,6 +299,9 @@ export class TextParser {
 
   // Split a paragraph into lines based on the canvas width
   public splitParagraphIntoLines(paragraphIndex: number): void {
+    // Log entry with stack trace for debugging paragraph splitting.
+    // Use Error().stack to capture a readable stack trace alongside the index.
+    console.log(this.paragraphStylesManager.styles);
     const paragraph = this.paragraphs[paragraphIndex];
 
     // Ensure canvas context has correct font for measurements

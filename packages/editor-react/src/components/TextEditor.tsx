@@ -6,8 +6,8 @@ import { OptionalExportHandlers, ExportEventManager } from '../types/ExportHandl
 import { useExportHandlers } from '../hooks/useExportHandlers';
 
 import { useEffect, useRef, useState } from 'react';
-import { baseText, baseTextSimple } from '../assets/baseText';
-import DebugPanel from './DebugPanel';
+import { baseText} from '../assets/baseText';
+
 
 const editorWidth = 800;
 const editorHeight = (editorWidth / 21) * 29.7; // A4 aspect ratio

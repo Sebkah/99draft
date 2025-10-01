@@ -140,7 +140,23 @@ export class Editor {
     this.pieceTable = new PieceTable(initialText, this.logger);
 
     // Initialize text renderer and input manager
-    this.paragraphStylesManager = new ParagraphStylesManager(this);
+    this.paragraphStylesManager = new ParagraphStylesManager(this, [
+      {
+        marginLeft: 45,
+        marginRight: 20,
+        lineHeight: 1.2,
+      },
+      {
+        marginLeft: 20,
+        marginRight: 200,
+        lineHeight: 1.5,
+      },
+      {
+        marginLeft: 20,
+        marginRight: 300,
+        lineHeight: 1.5,
+      },
+    ]);
     this.textParser = new TextParser(this.pieceTable, ctx, this);
 
     this.textRenderer = new TextRenderer(this.textParser, this);
@@ -245,7 +261,6 @@ export class Editor {
   setMarginsForCurrentParagraph(marginLeft: number, marginRight: number): void {
     const { paragraphIndex } = this.cursorManager.structurePosition;
 
-    console.log(this.paragraphStylesManager.styles);
     this.paragraphStylesManager.setParagraphStyles(paragraphIndex, { marginLeft, marginRight });
 
     this.textParser.splitParagraphIntoLines(paragraphIndex);

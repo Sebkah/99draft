@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { Editor } from '@99draft/editor-core';
 import RulerPin from './RulerPin';
 
@@ -23,10 +23,7 @@ const Ruler: React.FC<RulerProps> = ({ width, editor }) => {
   const [dragging, setDragging] = useState<'left' | 'right' | null>(null);
   const rulerRef = useRef<HTMLDivElement>(null);
 
-  // Initialize editor margins on mount
-  React.useEffect(() => {
-    editor.setMargins(leftMargin, rightMargin);
-  }, [editor, leftMargin, rightMargin]);
+
 
   /**
    * Calculate position from mouse event relative to ruler
