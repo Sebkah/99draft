@@ -174,22 +174,5 @@ export class SelectionManager {
     }
   }
 
-  /**
-   * Deletes the selected text and returns the range that was deleted
-   * @returns The deleted range or null if no selection
-   */
-  deleteSelection(): { start: number; length: number } | null {
-    if (!this.selection) {
-      return null;
-    }
 
-    const start = this.selection.start;
-    const length = this.selection.end - this.selection.start;
-
-    this.editor.getPieceTable().delete(start, length);
-    this.cursorManager.setCursorPosition(start);
-    this.clearSelection();
-
-    return { start, length };
-  }
 }

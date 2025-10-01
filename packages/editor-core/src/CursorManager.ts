@@ -58,16 +58,13 @@ export class CursorManager {
   public setCursorPosition(position: number): void {
     const clampedPosition = Math.max(0, Math.min(position, this.editor.getPieceTable().length)); //ugly, find a solution
 
-    /*   console.log(`From ${this.linearPosition} to ${position}`); */
-
     // Log the character at the clamped position as a JSON string for safer inspection
-    const char = this.editor.getPieceTable().getRangeText(clampedPosition, 1);
-    console.log('at character:', JSON.stringify(char));
+
     this.linearPosition = clampedPosition;
 
     this.mapLinearToStructure();
 
-    console.log('Cursor moved to paragraph:', this.structurePosition.paragraphIndex);
+    /*     console.log('Cursor moved to paragraph:', this.structurePosition.paragraphIndex); */
 
     // Clear selection when cursor moves
     if (this.selectionManager) {
@@ -80,7 +77,6 @@ export class CursorManager {
     if (this.selectionManager && (this.selectionManager as any).handleMoveLeftWithSelection()) {
       return;
     }
-
     this.setCursorPosition(this.linearPosition - amount);
   }
 

@@ -230,7 +230,7 @@ export class TextParser {
     const paragraph = this.paragraphs[paragraphIndex];
     if (!paragraph) return;
 
-    // Update paragraph 
+    // Update paragraph
     paragraph.updateText(
       this.pieceTable.getRangeText(paragraph.offset, paragraph.length + editLength),
     );
@@ -285,6 +285,15 @@ export class TextParser {
           currentOffset += token.length;
         }
       });
+    }
+
+    //XXX: bad fix
+    // Append a line break to the last paragraph
+    // This ensures the last paragraph is treated consistently, especially for splitting and merging
+    if (this.paragraphs.length > 0) {
+      const lastParagraph = this.paragraphs[this.paragraphs.length - 1];
+      lastParagraph.appendText('\n');
+      lastParagraph.adjustLength(1); // +1 for the newline
     }
   }
 
@@ -503,6 +512,8 @@ export class TextParser {
     const newParagraph = new Paragraph(secondPartText, cursorPosition + 1);
     newParagraph.setLength(secondPartText.length + 1); // +1 for the already existing newline
 
+    console.log('New paragraph created with text:', JSON.stringify(secondPartText));
+
     // Insert the new paragraph into the array right after the current one
     this.paragraphs.splice(paragraphIndex + 1, 0, newParagraph);
 
@@ -516,34 +527,51 @@ export class TextParser {
     this.splitParagraphIntoLines(paragraphIndex + 1);
   }
 
-  public mergeWithNextParagraph(paragraphIndex: number): void {
-    const currentParagraph = this.paragraphs[paragraphIndex];
-    const nextParagraph = this.paragraphs[paragraphIndex + 1];
-    if (!nextParagraph) return; // No next paragraph to merge with
+  /**
+   * Merge the paragraph at the given line break position with the next paragraph.
+   * This is a fast path for handling Backspace at the start of a paragraph.
+   * It updates the piece table, paragraph list, and re-parses the affected paragraph into lines.
+   * @param lineBreakPosition - Character offset of the line break to remove (i.e. just before the start of the paragraph to merge).
+   *
+   * Considerations:
+   * - The linebreaks are counted in the paragraph length but not stored in the paragraph text.
+   * - They are counted at the end of a paragraph.
+   **/
+
+  public mergeParagraphsAtLineBreak(lineBreakPosition: number): void {
+    const beforeParagraphIndex = this.findParagraphIndexAtOffset(lineBreakPosition);
+
+    const beforeParagraph = this.paragraphs[beforeParagraphIndex];
+
+    // Check we're not at the end of the document (no next paragraph to merge with)
+    if (beforeParagraphIndex === -1 || beforeParagraphIndex === this.paragraphs.length - 1) {
+      console.warn('No next paragraph to merge with at line break position', lineBreakPosition);
+      return;
+    }
+
+    const afterParagraph = this.paragraphs[beforeParagraphIndex + 1];
 
     // Remove the next paragraph from the array
-    this.paragraphs.splice(paragraphIndex + 1, 1);
+    this.paragraphs.splice(beforeParagraphIndex + 1, 1);
 
     // Calculate the new combined length
     // When merging paragraphs, we subtract 1 for the removed newline character
-    // but ensure the result is never negative (for empty paragraphs)
-    const newLength = Math.max(0, currentParagraph.length + nextParagraph.length);
+    const newLength = Math.max(0, beforeParagraph.length - 1 + afterParagraph.length);
 
     // Get the text of the new combined paragraph from the piece table
-    const text =
-      newLength > 0 ? this.pieceTable.getRangeText(currentParagraph.offset, newLength) : '';
+    const text = this.pieceTable.getRangeText(beforeParagraph.offset, newLength);
 
     // Update the current paragraph with the merged content
-    currentParagraph.updateText(text);
-    currentParagraph.setLength(newLength); // -1 for the removed newline
+    beforeParagraph.updateText(text);
+    beforeParagraph.setLength(newLength);
 
     // Shift offsets for all subsequent paragraphs (-1 for the removed newline)
-    for (let i = paragraphIndex + 1; i < this.paragraphs.length; i++) {
+    for (let i = beforeParagraphIndex + 1; i < this.paragraphs.length; i++) {
       this.paragraphs[i].shiftOffset(-1);
     }
 
     // Re-parse the merged paragraph into lines since its content changed
-    this.splitParagraphIntoLines(paragraphIndex);
+    this.splitParagraphIntoLines(beforeParagraphIndex);
   }
 
   public getParagraph(index: number): Paragraph | null {

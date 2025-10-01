@@ -307,14 +307,6 @@ export class Editor {
     // If it's not just one letter
     const parts = text.split('\n');
 
-    // Handle selection deletion if there's a selection
-    const deletedRange = this.selectionManager.deleteSelection();
-    if (deletedRange) {
-      this.textParser.splitIntoParagraphs();
-      this.textParser.splitAllParagraphsIntoLines();
-      this.cursorManager.mapLinearToStructure();
-    }
-
     if (parts.length > 1) {
       // Split it around the line breaks
       // Insert each part separately with line breaks in between
@@ -334,7 +326,7 @@ export class Editor {
 
     this.pieceTable.insert(text, cursorPosition);
     this.textParser.reparseParagraph(cursorPosition, text.length);
-  
+
     this.textParser.splitParagraphsIntoPages();
 
     this.cursorManager.moveRight(text.length);
@@ -345,70 +337,45 @@ export class Editor {
 
   //TODO: this should also do partial reparsing, but we need to be carefull if we delete newlines
   deleteText(length: number): void {
-    // Case 1: If there's a selection, delete it
-    const deletedRange = this.selectionManager.deleteSelection();
-    if (deletedRange) {
-      this.textParser.splitIntoParagraphs();
-      this.textParser.splitAllParagraphsIntoLines();
-      this.textParser.splitParagraphsIntoPages();
-      this.cursorManager.mapLinearToStructure();
-      this.renderPages();
-      this.emitDebugUpdate();
+    if (length === 0) {
+      console.warn('Delete length is 0, no operation performed');
       return;
     }
+    const currentPosition = this.cursorManager.getPosition();
+
+    // Case 1: If there's a selection, delete it
 
     // Case 2: No selection, delete before cursor
-    if (this.cursorManager.getPosition() > 0) {
-      const currentPos = this.cursorManager.getPosition();
+    // Case 2.1: Only one character
 
+    
+
+    if (currentPosition > 0) {
       // Validate position bounds
-      if (currentPos - length < 0) {
+      if (currentPosition - length < 0) {
         console.warn('Delete operation would exceed text bounds, adjusting length');
-        length = currentPos;
+        length = currentPosition;
       }
-
-      const paragraphAtCursor = this.textParser.findParagraphIndexAtOffset(currentPos);
-
       // Check if we are deleting a newline character
-      const charBefore = this.pieceTable.getRangeText(currentPos - 1, 1);
+      const charBefore = this.pieceTable.getRangeText(currentPosition - 1, 1);
 
       // Delete the text first
-      this.pieceTable.delete(currentPos - 1, length);
+      this.pieceTable.delete(currentPosition - 1, length);
 
       if (charBefore === '\n') {
-        // Validate that we can safely merge paragraphs
-        const targetParagraphIndex = paragraphAtCursor - 1;
-        if (
-          targetParagraphIndex >= 0 &&
-          targetParagraphIndex < this.textParser.getParagraphs().length - 1
-        ) {
-          // Merge paragraphs in text parser
-          this.textParser.mergeWithNextParagraph(targetParagraphIndex);
-
-          // Then update styles after text merge
-          this.paragraphStylesManager.mergeWithNextParagraphStyle(
-            targetParagraphIndex,
-            this.textParser,
-          );
-        } else {
-          // Fall back to full reparsing if merge is not possible
-          this.textParser.splitIntoParagraphs();
-          this.textParser.splitAllParagraphsIntoLines();
-        }
+        // Merge paragraphs
+        this.textParser.mergeParagraphsAtLineBreak(currentPosition - 1); // Pass position of deleted newline
       } else {
         // For regular character deletion, re-parse the affected paragraph
         // Similar to how insertText handles regular text insertion
-        this.textParser.reparseParagraph(Math.max(0, currentPos - length), -length);
+        this.textParser.reparseParagraph(Math.max(0, currentPosition - length), -length);
       }
 
       this.textParser.splitParagraphsIntoPages();
 
       // Ensure cursor position is valid before setting it
-      const newCursorPos = Math.max(0, Math.min(this.pieceTable.length, currentPos - length));
+      const newCursorPos = Math.max(0, Math.min(this.pieceTable.length, currentPosition - length));
       this.cursorManager.setCursorPosition(newCursorPos);
-
-      // Update cursor structure mapping after deletion
-      this.cursorManager.mapLinearToStructure();
 
       this.renderPages();
       this.emitDebugUpdate();

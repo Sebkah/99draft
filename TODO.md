@@ -7,3 +7,8 @@ Major :
 
 - styleManager
 - partial rendering
+
+Bugs :
+
+- insertion at the end of the document
+- globally handling of the end of the doc
