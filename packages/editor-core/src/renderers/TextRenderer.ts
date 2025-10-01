@@ -76,12 +76,11 @@ export class TextRenderer {
     }
   }
 
-  // Render selection highlight if present
-  private renderSelection(
+  // Render selection highlight for a single line if present
+  private renderLineSelection(
     ctx: CanvasRenderingContext2D,
-    paragraphs: any[],
-    startLineIndex: number,
-    endLineIndex: number,
+    paragraph: any,
+    line: any,
     leftMargin: number,
     lineHeight: number,
   ): void {
@@ -92,40 +91,29 @@ export class TextRenderer {
     const sel = this.editor.selectionManager.getSelection()!;
     const start = sel.start;
     const end = sel.end;
-    ctx.save();
-    ctx.fillStyle = 'rgba(56, 189, 248, 0.25)';
 
-    paragraphs.forEach((paragraph) => {
-      paragraph.lines.forEach((line: any, index: number) => {
-        // Only consider lines within the page's line range
-        if (
-          (paragraph === paragraphs[0] && index < startLineIndex) ||
-          (paragraph === paragraphs[paragraphs.length - 1] && index > endLineIndex)
-        ) {
-          return;
-        }
-        const lineStart = paragraph.offset + line.offset;
-        const lineEnd = lineStart + line.length;
+    const lineStart = paragraph.offset + line.offset;
+    const lineEnd = lineStart + line.length;
 
-        const overlStart = Math.max(start, lineStart);
-        const overlEnd = Math.min(end, lineEnd);
+    const overlStart = Math.max(start, lineStart);
+    const overlEnd = Math.min(end, lineEnd);
 
-        if (overlStart < overlEnd) {
-          const startChar = overlStart - lineStart;
-          const endChar = overlEnd - lineStart;
+    if (overlStart < overlEnd) {
+      const startChar = overlStart - lineStart;
+      const endChar = overlEnd - lineStart;
 
-          // measure widths
-          const startWidth = ctx.measureText(line.text.substring(0, startChar)).width;
-          const endWidth = ctx.measureText(line.text.substring(0, endChar)).width;
-          const rectX = leftMargin + startWidth;
-          const rectW = Math.max(1, endWidth - startWidth);
-          // Draw selection rectangle at current transform position
-          ctx.fillRect(rectX, 0, rectW, lineHeight);
-        }
-        ctx.translate(0, lineHeight);
-      });
-    });
-    ctx.restore();
+      // measure widths
+      const startWidth = ctx.measureText(line.text.substring(0, startChar)).width;
+      const endWidth = ctx.measureText(line.text.substring(0, endChar)).width;
+      const rectX = leftMargin + startWidth;
+      const rectW = Math.max(1, endWidth - startWidth);
+
+      ctx.save();
+      ctx.fillStyle = 'rgba(56, 189, 248, 0.25)';
+      // Draw selection rectangle at current transform position
+      ctx.fillRect(rectX, 0, rectW, lineHeight);
+      ctx.restore();
+    }
   }
 
   // Render debug information for paragraphs, lines, and cursor position
@@ -279,7 +267,6 @@ export class TextRenderer {
       return;
     }
 
-    const leftMargin = this.editor.margins.left; // Left margin for the text
     const lineHeight = 20; // Height of each line
     ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
 
@@ -307,12 +294,6 @@ export class TextRenderer {
     const startLineIndex = page.startLineIndex;
     const endLineIndex = page.endLineIndex;
 
-    // Create paragraphs array for selection rendering (keeping this for compatibility)
-    const paragraphs = allParagraphs.slice(page.startParagraphIndex, page.endParagraphIndex + 1);
-
-    // Draw selection highlight if present
-    this.renderSelection(ctx, paragraphs, startLineIndex, endLineIndex, leftMargin, lineHeight);
-
     for (let i = page.startParagraphIndex; i <= page.endParagraphIndex; i++) {
       const paragraph = allParagraphs[i];
       const marginLeft =
@@ -333,6 +314,9 @@ export class TextRenderer {
         ) {
           return;
         }
+
+        // Render selection highlight for this line (uses correct marginLeft)
+        this.renderLineSelection(ctx, paragraph, line, marginLeft, lineHeight);
 
         // Render cursor if it's in the current line and on the current page
         this.renderCursor(ctx, pageIndex, i, lindex, marginLeft, lineHeight);

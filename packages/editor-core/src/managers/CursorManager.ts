@@ -2,9 +2,7 @@ import { Editor } from '../core/Editor';
 import { TextParser } from '../core/TextParser';
 import { EventEmitter } from '../utils/EventEmitter';
 import type { CursorManagerEvents, CursorChangeEvent } from '../types/CursorEvents';
-
-// Forward declaration to avoid circular dependency
-class SelectionManager {}
+import type { SelectionManager } from './SelectionManager';
 
 export type StructurePosition = {
   pageIndex: number;
@@ -50,6 +48,7 @@ export class CursorManager extends EventEmitter<CursorManagerEvents> {
     this.mapLinearToStructure();
   }
 
+  // XXX: this is a dirty way to avoid circular dependency
   public setSelectionManager(selectionManager: any): void {
     this.selectionManager = selectionManager;
   }
@@ -77,7 +76,7 @@ export class CursorManager extends EventEmitter<CursorManagerEvents> {
 
       // Clear selection when cursor moves
       if (this.selectionManager) {
-        (this.selectionManager as any).clearSelection();
+        this.selectionManager.clearSelection();
       }
     }
   }
@@ -87,26 +86,56 @@ export class CursorManager extends EventEmitter<CursorManagerEvents> {
   }
 
   public moveLeft(amount: number): void {
-    // Handle selection if there's one
-    if (this.selectionManager && (this.selectionManager as any).handleMoveLeftWithSelection()) {
-      return;
+    // Handle selection if there's one - collapse to start position
+    if (this.selectionManager && this.selectionManager.hasSelection()) {
+      const selection = this.selectionManager.getSelection();
+      if (selection) {
+        this.setCursorPosition(selection.start);
+        this.selectionManager.clearSelection();
+        return;
+      }
     }
     this.setCursorPosition(this.linearPosition - amount);
   }
 
   public moveRight(amount: number): void {
-    // Handle selection if there's one
-    if (this.selectionManager && (this.selectionManager as any).handleMoveRightWithSelection()) {
-      return;
+    // Handle selection if there's one - collapse to end position
+    if (this.selectionManager && this.selectionManager.hasSelection()) {
+      const selection = this.selectionManager.getSelection();
+      if (selection) {
+        this.setCursorPosition(selection.end);
+        this.selectionManager.clearSelection();
+        return;
+      }
     }
     this.setCursorPosition(this.linearPosition + amount);
   }
 
   public moveUp(): void {
+    // Handle selection if there's one - collapse to start position
+    if (this.selectionManager && this.selectionManager.hasSelection()) {
+      const selection = this.selectionManager.getSelection();
+      if (selection) {
+        this.setCursorPosition(selection.start);
+        this.selectionManager.clearSelection();
+        return;
+      }
+    }
+
     this.getLineAdjacentLinearPosition(this.linearPosition, 'above', true);
   }
 
   public moveDown(): void {
+    // Handle selection if there's one - collapse to start position
+    if (this.selectionManager && this.selectionManager.hasSelection()) {
+      const selection = this.selectionManager.getSelection();
+      if (selection) {
+        this.setCursorPosition(selection.start);
+        this.selectionManager.clearSelection();
+        return;
+      }
+    }
+
     this.getLineAdjacentLinearPosition(this.linearPosition, 'below', true);
   }
 
@@ -373,6 +402,7 @@ export class CursorManager extends EventEmitter<CursorManagerEvents> {
     const line = targetParagraph.lines[targetLine];
 
     // Handle empty line quickly
+    // XXX: check this code out
     if (!line.text || line.text.length === 0) {
       console.log('Empty line, moving to start of line');
       const newPos = targetParagraph.offset + line.offset;

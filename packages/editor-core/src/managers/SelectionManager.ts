@@ -134,34 +134,6 @@ export class SelectionManager {
   }
 
   /**
-   * Handles cursor movement when there's a selection
-   * Collapses selection to start position
-   * @returns true if selection was handled, false if no selection
-   */
-  handleMoveLeftWithSelection(): boolean {
-    if (this.selection) {
-      this.cursorManager.setCursorPosition(this.selection.start);
-      this.clearSelection();
-      return true;
-    }
-    return false;
-  }
-
-  /**
-   * Handles cursor movement when there's a selection
-   * Collapses selection to end position
-   * @returns true if selection was handled, false if no selection
-   */
-  handleMoveRightWithSelection(): boolean {
-    if (this.selection) {
-      this.cursorManager.setCursorPosition(this.selection.end);
-      this.clearSelection();
-      return true;
-    }
-    return false;
-  }
-
-  /**
    * Selects all text in the document
    */
   selectAll(): void {
