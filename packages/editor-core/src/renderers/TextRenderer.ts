@@ -133,65 +133,83 @@ export class TextRenderer {
     ctx.font = '12px Arial';
 
     const page = this.textParser.getPages()[pageIndex];
-
     const paragraphs = this.textParser.getParagraphs();
-    const position = ctx.canvas.width - this.editor.margins.right;
 
-    ctx.translate(0, lineHeight + this.editor.margins.top); // Start below top margin
-    paragraphs.forEach((paragraph, pindex) => {
-      // Only render paragraphs that are on the current page
-      if (pindex > page.endParagraphIndex || pindex < page.startParagraphIndex) {
-        return;
-      }
+    // Start at the top margin like the main render method
+    ctx.translate(0, this.editor.margins.top);
+
+    // Only iterate through paragraphs that are actually on this page
+    for (let pindex = page.startParagraphIndex; pindex <= page.endParagraphIndex; pindex++) {
+      const paragraph = paragraphs[pindex];
+      if (!paragraph) continue;
+
+      // Get paragraph styles to use correct margins
+      const styles = this.editor.paragraphStylesManager.getParagraphStyles(pindex);
+      const { marginLeft, marginRight } = styles;
+
+      // Calculate debug info position using the right margin
+      const debugInfoPosition = ctx.canvas.width - marginRight;
+
+      // Determine which lines of this paragraph are on this page
+      const startLineIndex = pindex === page.startParagraphIndex ? page.startLineIndex : 0;
+      const endLineIndex =
+        pindex === page.endParagraphIndex ? page.endLineIndex : paragraph.lines.length - 1;
+
+      // Calculate how many lines this paragraph contributes to this page
+      const linesOnThisPage = endLineIndex - startLineIndex + 1;
+      const paragraphHeightOnPage = linesOnThisPage * lineHeight;
 
       // Highlight hovered paragraph area (always, regardless of debug text toggle)
       if (this.hoveredParagraphIndex === pindex) {
-        const left = this.editor.margins.left - 2;
+        const left = marginLeft - 2;
         const width = this.editor.wrappingWidth + 4;
-        const height = paragraph.lines.length * lineHeight;
-        const top = -lineHeight;
+        const height = paragraphHeightOnPage;
+        const top = 0;
         ctx.save();
         ctx.strokeStyle = 'rgba(56, 189, 248, 0.9)';
         ctx.lineWidth = 2;
         ctx.strokeRect(left, top, width, height);
         ctx.restore();
       }
+
       // Render paragraph debug info
       if (this.showDebugInfo && this.editor.debugConfig.showParagraphBounds) {
         const padding = 5;
-
-        const paragraphHeight = paragraph.lines.length * lineHeight;
-        const paragraphHeightWithoutPadding = paragraphHeight - padding * 2;
-
+        const paragraphHeightWithoutPadding = paragraphHeightOnPage - padding * 2;
         const paragraphMidHeight = paragraphHeightWithoutPadding / 2;
-
-        const paragraphTop = -lineHeight;
 
         ctx.fillStyle = 'blue';
         ctx.fillText(
           `P${pindex} - L ${paragraph.length}`,
-          position + 10,
-          paragraphMidHeight - lineHeight / 2 + padding,
+          debugInfoPosition + 10,
+          paragraphMidHeight + lineHeight / 2 + padding,
         );
         ctx.fillText(
           ` O ${paragraph.offset}`,
-          position + 80,
-          paragraphMidHeight - lineHeight / 2 + padding,
+          debugInfoPosition + 80,
+          paragraphMidHeight + lineHeight / 2 + padding,
         );
         ctx.fillText(
           ` E ${paragraph.offset + paragraph.length}`,
-          position + 170,
-          paragraphMidHeight - lineHeight / 2 + padding,
+          debugInfoPosition + 170,
+          paragraphMidHeight + lineHeight / 2 + padding,
         );
 
         ctx.fillStyle = 'green';
-        ctx.fillRect(position, paragraphTop + padding * 2, 4, paragraphHeightWithoutPadding); // Underline for paragraph info
+        ctx.fillRect(debugInfoPosition, padding * 2, 4, paragraphHeightWithoutPadding);
       }
 
-      paragraph.lines.forEach((line, lindex) => {
+      // Iterate through lines that are actually on this page
+      for (let lindex = startLineIndex; lindex <= endLineIndex; lindex++) {
+        const line = paragraph.lines[lindex];
+        if (!line) continue;
+
+        // Use translate for Y positioning like main render method
+        ctx.translate(0, lineHeight);
+
         // Highlight hovered line (always)
         if (this.hoveredLine && this.hoveredLine.p === pindex && this.hoveredLine.l === lindex) {
-          const left = this.editor.margins.left - 2;
+          const left = marginLeft - 2;
           const width = Math.max(0, Math.min(this.editor.wrappingWidth, line.pixelLength + 4));
           const top = -lineHeight + 1;
           const height = lineHeight - 2;
@@ -201,6 +219,7 @@ export class TextRenderer {
           ctx.strokeRect(left, top, width, height);
           ctx.restore();
         }
+
         // Render line debug info
         if (this.showDebugInfo && this.editor.debugConfig.showLineInfo) {
           ctx.fillStyle = 'blue';
@@ -208,11 +227,12 @@ export class TextRenderer {
           ctx.fillText(`length ${line.length}`, 80, 0);
         }
 
+        // Render word offsets debug info
         if (this.showDebugInfo && this.editor.debugConfig.showWordOffsets) {
           line.wordpixelOffsets.forEach((wordOffset, windex) => {
             // Render word pixel offsets as small vertical lines
             ctx.fillStyle = 'red';
-            ctx.fillRect(wordOffset + this.editor.margins.left - 1, -lineHeight, 2, lineHeight);
+            ctx.fillRect(wordOffset + marginLeft - 1, -lineHeight, 2, lineHeight);
             ctx.fillStyle = 'green';
             const topOrBottom =
               windex % 2 === 0 ? lineHeight - lineHeight / 2 + 7 : lineHeight - lineHeight / 2;
@@ -231,12 +251,11 @@ export class TextRenderer {
                 break;
             }
 
-            ctx.fillText(displayText, wordOffset + this.editor.margins.left - 2, topOrBottom);
+            ctx.fillText(displayText, wordOffset + marginLeft - 2, topOrBottom);
           });
         }
-        ctx.translate(0, lineHeight);
-      });
-    });
+      }
+    }
 
     // Restore the context state (which will restore the base text style)
     ctx.restore();
@@ -296,15 +315,17 @@ export class TextRenderer {
 
     for (let i = page.startParagraphIndex; i <= page.endParagraphIndex; i++) {
       const paragraph = allParagraphs[i];
-      const marginLeft =
-        this.editor.paragraphStylesManager.getParagraphStyles(i).marginLeft ??
-        this.editor.margins.left;
+      const styles = this.editor.paragraphStylesManager.getParagraphStyles(i);
+
+      const { align, marginLeft, marginRight } = styles;
+
+      const wrappingWidth = this.editor.internalCanvas.width - marginLeft - marginRight;
 
       // Safety check: Skip if paragraph is undefined (can happen during text deletion)
-      if (!paragraph || !paragraph.lines) {
+      /*    if (!paragraph || !paragraph.lines) {
         console.warn(`Paragraph at index ${i} is undefined or has no lines. Skipping rendering.`);
         continue;
-      }
+      } */
 
       paragraph.lines.forEach((line, lindex) => {
         // Only render lines within the page's line range
@@ -321,18 +342,46 @@ export class TextRenderer {
         // Render cursor if it's in the current line and on the current page
         this.renderCursor(ctx, pageIndex, i, lindex, marginLeft, lineHeight);
 
-        if (this.justifyText) {
-          const lineLenghtRest = this.editor.wrappingWidth - line.pixelLength;
-          const spaceCount = (line.text.match(/ /g) || []).length;
-          const distributeSpace = spaceCount > 0 ? lineLenghtRest / spaceCount : 0;
+        const lineLengthRest = wrappingWidth - line.pixelLength;
 
-          if (distributeSpace < 20) {
+        if (align === 'justify') {
+          const textWithoutLeadingAndTrailingSpaces = line.text.trim();
+          const lineLengthRestWithoutSpaces =
+            wrappingWidth - ctx.measureText(textWithoutLeadingAndTrailingSpaces).width;
+
+          const spaceCount = (textWithoutLeadingAndTrailingSpaces.match(/ /g) || []).length;
+          const distributeSpace = spaceCount > 0 ? lineLengthRestWithoutSpaces / spaceCount : 0;
+
+          // Prevent excessive word spacing that would look unnatural (max ~10000px seems reasonable)
+          if (distributeSpace < 10000) {
             ctx.wordSpacing = distributeSpace + 'px';
           }
+          ctx.translate(0, lineHeight);
+          this.renderLine(ctx, textWithoutLeadingAndTrailingSpaces, marginLeft, 0);
+          ctx.wordSpacing = '0px'; // Reset word spacing after justify
+
+          return;
+        }
+
+        if (align === 'center') {
+          const offset = lineLengthRest / 2;
+          ctx.translate(0, lineHeight);
+          this.renderLine(ctx, line.text, marginLeft + offset, 0);
+          ctx.wordSpacing = '0px'; // Ensure word spacing is reset
+
+          return;
+        }
+
+        if (align === 'right') {
+          ctx.translate(0, lineHeight);
+          this.renderLine(ctx, line.text, marginLeft + lineLengthRest, 0);
+          ctx.wordSpacing = '0px'; // Ensure word spacing is reset
+          return;
         }
 
         ctx.translate(0, lineHeight);
         this.renderLine(ctx, line.text, marginLeft, 0);
+        ctx.wordSpacing = '0px';
       });
     }
 

@@ -59,11 +59,11 @@ const Pages = ({ editor, canvasRefs }: PagesProps) => {
   }, [numberOfPages, editor, canvasRefs]);
 
   return (
-    <>
+    <div className="flex flex-col gap-4">
       {Array.from({ length: numberOfPages }).map((_, index) => (
         <Page key={index} index={index} editor={editor} ref={canvasRefs} />
       ))}
-    </>
+    </div>
   );
 };
 

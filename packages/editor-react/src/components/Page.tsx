@@ -16,28 +16,38 @@ export type PageProps = {
  */
 const Page = ({ index, editor, ref }: PageProps) => {
   return (
-    <canvas
-      ref={(el) => {
-        if (!ref.current) ref.current = [];
-        ref.current[index] = el;
-      }}
-      tabIndex={0} // Make canvas focusable for keyboard input
-      width={editorWidth}
-      height={editorHeight}
-      onPointerMove={(e) => {
-        if (!editor || !e.buttons) return;
-        editor.updateSelection({ x: e.nativeEvent.offsetX, y: e.nativeEvent.offsetY, page: index });
-      }}
-      onPointerDown={(e) => {
-        if (!editor) return;
-        editor.startSelection({ x: e.nativeEvent.offsetX, y: e.nativeEvent.offsetY, page: index });
-      }}
-      onPointerUp={(e) => {
-        if (!editor) return;
-        editor.endSelection({ x: e.nativeEvent.offsetX, y: e.nativeEvent.offsetY, page: index });
-      }}
-      className="bg-white pointer-events-auto shadow-lg focus:outline-none "
-    />
+    <div className="rounded-[3px] overflow-hidden shadow-md ">
+      <canvas
+        ref={(el) => {
+          if (!ref.current) ref.current = [];
+          ref.current[index] = el;
+        }}
+        tabIndex={0} // Make canvas focusable for keyboard input
+        width={editorWidth}
+        height={editorHeight}
+        onPointerMove={(e) => {
+          if (!editor || !e.buttons) return;
+          editor.updateSelection({
+            x: e.nativeEvent.offsetX,
+            y: e.nativeEvent.offsetY,
+            page: index,
+          });
+        }}
+        onPointerDown={(e) => {
+          if (!editor) return;
+          editor.startSelection({
+            x: e.nativeEvent.offsetX,
+            y: e.nativeEvent.offsetY,
+            page: index,
+          });
+        }}
+        onPointerUp={(e) => {
+          if (!editor) return;
+          editor.endSelection({ x: e.nativeEvent.offsetX, y: e.nativeEvent.offsetY, page: index });
+        }}
+        className="bg-white pointer-events-auto shadow-lg focus:outline-none "
+      />
+    </div>
   );
 };
 

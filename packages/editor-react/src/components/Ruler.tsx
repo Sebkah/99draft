@@ -158,7 +158,7 @@ const Ruler: React.FC<RulerProps> = ({ width, editor }) => {
   return (
     <div
       ref={rulerRef}
-      className="relative bg-white border-b border-gray-300 select-none"
+      className="relative bg-white border-b border-gray-300 select-none shadow-lg"
       style={{ width: `${width}px`, height: '20px' }} // Reduced height
     >
       {/* Ruler background and ticks */}

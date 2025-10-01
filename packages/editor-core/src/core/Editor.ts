@@ -157,6 +157,19 @@ export class Editor extends EventEmitter<EditorEvents> {
         marginLeft: 20,
         marginRight: 300,
         lineHeight: 1.5,
+        align: 'justify',
+      },
+      {
+        marginLeft: 20,
+        marginRight: 300,
+        lineHeight: 1.5,
+        align: 'justify',
+      },
+      {
+        marginLeft: 100,
+        marginRight: 100,
+        lineHeight: 1.5,
+        align: 'right',
       },
     ]);
     this.textParser = new TextParser(this.pieceTable, ctx, this);
@@ -259,7 +272,29 @@ export class Editor extends EventEmitter<EditorEvents> {
   setMarginsForCurrentParagraph(marginLeft: number, marginRight: number): void {
     const { paragraphIndex } = this.cursorManager.structurePosition;
 
-    this.paragraphStylesManager.setParagraphStyles(paragraphIndex, { marginLeft, marginRight });
+    this.paragraphStylesManager.setParagraphStylesPartial(paragraphIndex, {
+      marginLeft,
+      marginRight,
+    });
+
+    this.textParser.splitParagraphIntoLines(paragraphIndex);
+
+    this.textParser.splitParagraphsIntoPages();
+
+    this.cursorManager.mapLinearToStructure();
+    this.renderPages();
+  }
+
+  /**
+   * Set text alignment for the current paragraph
+   * @param align - The alignment to apply: 'left', 'center', 'right', or 'justify'
+   */
+  setAlignmentForCurrentParagraph(align: 'left' | 'center' | 'right' | 'justify'): void {
+    const { paragraphIndex } = this.cursorManager.structurePosition;
+
+    this.paragraphStylesManager.setParagraphStylesPartial(paragraphIndex, {
+      align,
+    });
 
     this.textParser.splitParagraphIntoLines(paragraphIndex);
 

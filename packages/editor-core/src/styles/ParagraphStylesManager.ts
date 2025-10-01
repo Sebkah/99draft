@@ -1,9 +1,9 @@
 import { Editor } from '..';
 
 export type ParagraphStyle = {
-  marginLeft?: number;
-  marginRight?: number;
-  align?: 'left' | 'center' | 'right' | 'justify';
+  marginLeft: number;
+  marginRight: number;
+  align: 'left' | 'center' | 'right' | 'justify';
   lineHeight?: number;
 };
 
@@ -12,9 +12,9 @@ export class ParagraphStylesManager {
 
   // Native sparse array: undefined holes for paragraphs with default styles
   // Only defined indices contain custom styles
- styles: (ParagraphStyle | undefined)[] = [];
+  styles: (Partial<ParagraphStyle> | undefined)[] = [];
 
-  constructor(editor: Editor, initialStyles?: (ParagraphStyle | undefined)[]) {
+  constructor(editor: Editor, initialStyles?: (Partial<ParagraphStyle> | undefined)[]) {
     this.editor = editor;
     if (initialStyles) {
       // JavaScript spread preserves sparseness naturally
@@ -58,14 +58,18 @@ export class ParagraphStylesManager {
    * @param paragraphIndex - Zero-based index of the paragraph
    * @param styles - Custom styles to apply, or null to use defaults
    */
-  setParagraphStyles(paragraphIndex: number, styles: ParagraphStyle | null) {
+  setParagraphStylesPartial(paragraphIndex: number, styles: Partial<ParagraphStyle> | null) {
     if (styles === null) {
       // Create a true sparse hole by deleting the index
       delete this.styles[paragraphIndex];
     } else {
-      this.styles[paragraphIndex] = styles;
+      // Merge with existing styles, keeping old values if not set again
+      const existingStyles = this.styles[paragraphIndex] || {};
+      this.styles[paragraphIndex] = { ...existingStyles, ...styles };
     }
-  } /**
+  }
+
+  /**
    * Check if a paragraph has custom styles (vs using defaults).
    *
    * @param paragraphIndex - Zero-based index of the paragraph
@@ -86,8 +90,8 @@ export class ParagraphStylesManager {
     // Insert the same styles (or undefined for holes) for the new paragraph
     // This automatically shifts all subsequent indices
     this.styles.splice(paragraphIndex + 1, 0, currentStyles);
-  } 
-  
+  }
+
   /**
    * Merge paragraphs: handle the index shifting when paragraphs are combined.
    *
@@ -107,5 +111,4 @@ export class ParagraphStylesManager {
       }
     }
   }
-
 }

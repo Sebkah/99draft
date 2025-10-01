@@ -1,13 +1,13 @@
 import { Editor } from '@99draft/editor-core';
 
 import Ruler from './Ruler';
+import Toolbar from './Toolbar';
 import Pages from './Pages';
 import { OptionalExportHandlers, ExportEventManager } from '../types/ExportHandlers';
 import { useExportHandlers } from '../hooks/useExportHandlers';
 
 import { useEffect, useRef, useState } from 'react';
-import { baseText} from '../assets/baseText';
-
+import { baseText } from '../assets/baseText';
 
 const editorWidth = 800;
 const editorHeight = (editorWidth / 21) * 29.7; // A4 aspect ratio
@@ -79,9 +79,15 @@ const TextEditor = ({ exportHandlers, exportEventManager }: TextEditorProps = {}
   return (
     <>
       {/* Main text editor canvas */}
-      <div className=" grid grid-rows-auto w-dvw gap-4 justify-center overflow-x-hidden overflow-y-auto bg-gray-200 ">
-        <Ruler width={editorWidth} editor={editor} />
-        <Pages editor={editor} canvasRefs={canvasRefs} />
+      <div className="relative w-full h-full overflow-y-auto bg-gray-200 flex flex-col items-center">
+        {/* Fixed toolbar at the top */}
+        <div className="fixed top-0 z-50 flex flex-col items-center gap-2 py-2">
+          <Toolbar editor={editor} />
+          <Ruler width={editorWidth} editor={editor} />
+        </div>
+        <div className="pt-20">
+          <Pages editor={editor} canvasRefs={canvasRefs} />
+        </div>
       </div>
 
       {/* Debug panel positioned at bottom right */}
