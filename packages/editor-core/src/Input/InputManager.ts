@@ -44,7 +44,7 @@ export class InputManager {
       this.numberOfLeftArrowPresses = 0;
       this.lastRightArrowTime = currentTime;
       this.arrowSpeedMultiplier = 1 + this.numberOfRightArrowPresses * 0.1;
-      return this.arrowSpeedMultiplier;
+      Math.floor(this.arrowSpeedMultiplier);
     }
 
     // left
@@ -60,7 +60,7 @@ export class InputManager {
     this.numberOfRightArrowPresses = 0;
     this.lastLeftArrowTime = currentTime;
     this.arrowSpeedMultiplier = 1 + this.numberOfLeftArrowPresses * 0.1;
-    return this.arrowSpeedMultiplier;
+    return Math.floor(this.arrowSpeedMultiplier);
   }
 
   /**

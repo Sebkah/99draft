@@ -1,3 +1,4 @@
+import { Editor } from '..';
 import { TextParser } from '../TextParser';
 
 export type ParagraphStyle = {
@@ -8,8 +9,9 @@ export type ParagraphStyle = {
 };
 
 export class ParagraphStylesManager {
+  private editor: Editor;
   private styles: ParagraphStyle[] = [
-    {
+    /*  {
       marginLeft: 0,
       marginRight: 40,
       lineHeight: 1.2,
@@ -23,15 +25,22 @@ export class ParagraphStylesManager {
       marginLeft: 20,
       marginRight: 300,
       lineHeight: 1.5,
-    },
+    }, */
   ];
 
-  constructor($styles?: ParagraphStyle[]) {
+  constructor(editor: Editor, $styles?: ParagraphStyle[]) {
+    this.editor = editor;
     if ($styles) this.styles = $styles;
   }
 
   getParagraphStyles(paragraphIndex: number): ParagraphStyle {
-    return this.styles[paragraphIndex] || { marginLeft: 0, marginRight: 0, lineHeight: 1.2 };
+    return (
+      this.styles[paragraphIndex] || {
+        marginLeft: this.editor.margins.left,
+        marginRight: this.editor.margins.right,
+        lineHeight: 20,
+      }
+    );
   }
 
   setParagraphStyles(paragraphIndex: number, styles: ParagraphStyle) {

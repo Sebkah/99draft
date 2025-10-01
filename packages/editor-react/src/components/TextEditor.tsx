@@ -6,7 +6,7 @@ import { OptionalExportHandlers, ExportEventManager } from '../types/ExportHandl
 import { useExportHandlers } from '../hooks/useExportHandlers';
 
 import { useEffect, useRef, useState } from 'react';
-import { baseText } from '../assets/baseText';
+import { baseTextSimple } from '../assets/baseText';
 import DebugPanel from './DebugPanel';
 
 const editorWidth = 800;
@@ -32,8 +32,8 @@ const TextEditor = ({ exportHandlers, exportEventManager }: TextEditorProps = {}
 
   const [editor] = useState<Editor>(
     new Editor(
-      baseText,
-      { left: 100, right: 100, top: 50 }, // Default margins that will be overridden by Ruler
+      baseTextSimple,
+      { left: 100, right: 400, top: 50 }, // Default margins that will be overridden by Ruler
       editorWidth,
       editorHeight,
     ),
@@ -44,7 +44,7 @@ const TextEditor = ({ exportHandlers, exportEventManager }: TextEditorProps = {}
    */
   useEffect(() => {
     editor.linkCanvases(canvasRefs.current);
-    console.log('Initial canvas linking:', canvasRefs.current);
+    /*     console.log('Initial canvas linking:', canvasRefs.current); */
     editor.initialize();
 
     // Cleanup on unmount
@@ -80,17 +80,12 @@ const TextEditor = ({ exportHandlers, exportEventManager }: TextEditorProps = {}
     <>
       {/* Main text editor canvas */}
       <div className=" grid grid-rows-auto w-dvw gap-4 justify-center overflow-x-hidden overflow-y-auto bg-gray-200 ">
-        <Ruler
-          width={editorWidth}
-          editor={editor}
-          defaultLeftMargin={100}
-          defaultRightMargin={100}
-        />
+        <Ruler width={editorWidth} editor={editor} />
         <Pages editor={editor} canvasRefs={canvasRefs} />
       </div>
 
       {/* Debug panel positioned at bottom right */}
-      {/*       {editor && <DebugPanel editor={editor} />} */}
+      {/*   {editor && <DebugPanel editor={editor} />} */}
     </>
   );
 };

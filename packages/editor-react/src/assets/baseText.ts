@@ -9,3 +9,6 @@ Venons-en maintenant à la naissance de l’État social et à l’affirmation d
 « Le soin, écrit Nicolas Da Silva, est un sujet politique et de politique publique bien avant la première moitié du XXe siècle. Cependant, ce n’est qu’avec les deux guerres mondiales que l’on constate l’explosion du secteur des soins dans les dépenses de l’État. Pour comprendre le lien entre guerre totale et État social, il est nécessaire de déplacer le regard que l’on porte habituellement sur les périodes de guerre. Ce ne sont pas des parenthèses entre deux cycles de paix, ce sont des périodes fondatrices d’un nouvel ordre trouvant ses racines dans la préparation, la conduite et les conséquences de la guerre. La Grande Guerre (1914-1918) modifie la place de l’État dans la société, rendant possible ce qui était autrefois impossible : l’adoption des assurances sociales de 1928-1930. L’État ne devient social que parce qu’il a organisé la guerre totale. »
 
 `;
+
+export const baseTextSimple =
+  '(3)\n(3)This is a simple base text. It has multiple lines.\n\nAnd another one.\nAnd another one.';

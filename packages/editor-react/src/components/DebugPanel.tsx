@@ -20,11 +20,11 @@ const DebugPanel: React.FC<Props> = ({ editor }) => {
   const pieceTable = useMemo(() => editor.getPieceTable(), [editor]);
 
   const [showDebugInfo, setShowDebugInfo] = useState<boolean>(renderer?.showDebugInfo ?? true);
-  const [collapsed, setCollapsed] = useState<boolean>(true);
+  const [collapsed, setCollapsed] = useState<boolean>(false);
   const [debugConfig, setDebugConfig] = useState<DebugConfig>({ ...editor.debugConfig });
 
   useEffect(() => {
-    editor.startDebugUpdates((newPieces) => {
+    editor.setDebugUpdateCallback((newPieces) => {
       setPieces(newPieces);
       setCursor({
         pos: editor.cursorManager.getPosition(),
@@ -33,7 +33,7 @@ const DebugPanel: React.FC<Props> = ({ editor }) => {
     });
     return () => {
       // Clear the subscription with a noop to avoid stale callbacks
-      editor.startDebugUpdates(() => {});
+      editor.setDebugUpdateCallback(() => {});
     };
   }, [editor]);
 
@@ -157,7 +157,7 @@ const DebugPanel: React.FC<Props> = ({ editor }) => {
           </div>
         </Section>
 
-        <Section title="Renderer Debug" accent="emerald" defaultOpen>
+        <Section title="Renderer Debug" accent="emerald">
           <ToggleRow label="Show cursor">
             <Switch
               checked={debugConfig.showCursor}
@@ -256,7 +256,7 @@ const DebugPanel: React.FC<Props> = ({ editor }) => {
           </div>
         </Section>
 
-        <Section title="Stats" accent="emerald" defaultOpen>
+        <Section title="Stats" accent="emerald">
           {(() => {
             const paragraphs = editor.getTextParser()?.getParagraphs() ?? [];
             const totalLines = paragraphs.reduce((acc, p) => acc + p.lines.length, 0);
@@ -291,7 +291,7 @@ const DebugPanel: React.FC<Props> = ({ editor }) => {
           })()}
         </Section>
 
-        <Section title="Structures" accent="sky" defaultOpen>
+        <Section title="Structures" accent="sky">
           <div className="space-y-2 relative" ref={structuresRef}>
             {(editor.getTextParser()?.getParagraphs() ?? []).map((p, pindex) => (
               <div key={pindex} className="rounded-md border border-white/10 bg-white/5">

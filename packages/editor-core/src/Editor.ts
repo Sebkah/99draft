@@ -140,18 +140,13 @@ export class Editor {
     this.pieceTable = new PieceTable(initialText, this.logger);
 
     // Initialize text renderer and input manager
-    this.paragraphStylesManager = new ParagraphStylesManager();
+    this.paragraphStylesManager = new ParagraphStylesManager(this);
     this.textParser = new TextParser(this.pieceTable, ctx, this);
 
     this.textRenderer = new TextRenderer(this.textParser, this);
     this.pdfRenderer = new PDFRenderer(this.textParser, this);
     this.docxRenderer = new DOCXRenderer(this.textParser, this);
-    this.cursorManager = new CursorManager(
-      Math.floor(this.pieceTable.length / 2),
-      this.textParser,
-      ctx,
-      this,
-    );
+    this.cursorManager = new CursorManager(0, this.textParser, ctx, this);
     this.selectionManager = new SelectionManager(this, this.cursorManager);
     this.cursorManager.setSelectionManager(this.selectionManager);
     this.inputManager = new InputManager(this.cursorManager, this);
@@ -201,6 +196,7 @@ export class Editor {
     for (let i = 0; i < this.numberOfPages; i++) {
       this.textRenderer.render(i);
     }
+    this.emitDebugUpdate();
   }
 
   /**
@@ -216,7 +212,6 @@ export class Editor {
   startSelection(mousePosition: MousePosition): void {
     this.selectionManager.startSelection(mousePosition);
     this.renderPages();
-    this.emitDebugUpdate();
   }
   updateSelection(mousePosition: MousePosition): void {
     this.selectionManager.updateSelection(mousePosition);
@@ -336,9 +331,7 @@ export class Editor {
     }
 
     this.pieceTable.insert(text, this.cursorManager.getPosition());
-
     this.textParser.reparseParagraph(this.cursorManager.getPosition(), text.length);
-
     this.cursorManager.setCursorPosition(
       Math.min(this.pieceTable.length, this.cursorManager.getPosition() + text.length),
     );
@@ -435,24 +428,26 @@ export class Editor {
   }
 
   insertLineBreak(): void {
-    const currentPosition = this.cursorManager.getPosition();
+    // Handle selection deletion if there's a selection
+    if (this.selectionManager.hasSelection()) {
+      console.warn('Inserting line break with active selection is not supported yet');
+      return;
+    }
 
-    // Get the paragraph index from the cursor's current structure position
-    const originalParagraphIndex = this.cursorManager.structurePosition.paragraphIndex;
+    const currentPosition = this.cursorManager.getPosition();
 
     // Insert the newline character
     this.pieceTable.insert('\n', currentPosition);
 
+    
     // Update cursor position first (after the newline)
-    const newPosition = Math.min(this.pieceTable.length, currentPosition + 1);
-    this.cursorManager.setCursorPosition(newPosition);
-
+    this.cursorManager.moveRight(1);
     // Update paragraph styles FIRST, before splitting the paragraph text
     // This ensures the new paragraph has the correct styles when splitParagraphIntoLines is called
-    this.paragraphStylesManager.splitParagraph(originalParagraphIndex);
-
-    // Split paragraph at the position of the newline character (currentPosition)
-    this.textParser.splitParagraph(currentPosition);
+    /* this.paragraphStylesManager.splitParagraph(originalParagraphIndex); */
+    
+    // Split paragraph at the position, after the line break
+    this.textParser.splitParagraph(this.cursorManager.getPosition());
 
     this.textParser.splitParagraphsIntoPages();
 
@@ -467,7 +462,7 @@ export class Editor {
    * Start debug information updates (triggered on input changes)
    * @param callback - Function to call with updated debug information
    */
-  startDebugUpdates(callback: (pieces: PieceDebug[]) => void): void {
+  setDebugUpdateCallback(callback: (pieces: PieceDebug[]) => void): void {
     this.debugUpdateCallback = callback;
     // Trigger initial update
     this.emitDebugUpdate();

@@ -170,17 +170,17 @@ export class TextRenderer {
 
         ctx.fillStyle = 'blue';
         ctx.fillText(
-          `P${pindex} - l ${paragraph.length}`,
+          `P${pindex} - L ${paragraph.length}`,
           position + 10,
           paragraphMidHeight - lineHeight / 2 + padding,
         );
         ctx.fillText(
-          ` o ${paragraph.offset}`,
+          ` O ${paragraph.offset}`,
           position + 80,
           paragraphMidHeight - lineHeight / 2 + padding,
         );
         ctx.fillText(
-          ` e ${paragraph.offset + paragraph.length}`,
+          ` E ${paragraph.offset + paragraph.length}`,
           position + 170,
           paragraphMidHeight - lineHeight / 2 + padding,
         );

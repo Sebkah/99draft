@@ -56,10 +56,18 @@ export class CursorManager {
   }
 
   public setCursorPosition(position: number): void {
-    position = Math.max(0, Math.min(position, this.editor.getPieceTable().length)); //ugly, find a solution
+    const clampedPosition = Math.max(0, Math.min(position, this.editor.getPieceTable().length)); //ugly, find a solution
 
-    this.linearPosition = position;
+    /*   console.log(`From ${this.linearPosition} to ${position}`); */
+
+    // Log the character at the clamped position as a JSON string for safer inspection
+    const char = this.editor.getPieceTable().getRangeText(clampedPosition, 1);
+    console.log('at character:', JSON.stringify(char));
+    this.linearPosition = clampedPosition;
+
     this.mapLinearToStructure();
+
+    console.log('Cursor moved to paragraph:', this.structurePosition.paragraphIndex);
 
     // Clear selection when cursor moves
     if (this.selectionManager) {
@@ -112,8 +120,7 @@ export class CursorManager {
       const paragraph = paragraphs[i];
 
       const isCursorInParagraph =
-        cursorPosition >= paragraph.offset &&
-        cursorPosition < paragraph.offset + paragraph.length + 1;
+        cursorPosition >= paragraph.offset && cursorPosition < paragraph.offset + paragraph.length;
 
       // If the cursor is in the paragraph, set the index of the paragraph and break the loop
       if (isCursorInParagraph) {
@@ -142,19 +149,15 @@ export class CursorManager {
 
       const cursorOffsetInParagraph = cursorPosition - paragraph.offset;
 
-      // This all looks very funky but works (and works like google docs)
-      const isOnlyLine = paragraph.lines.length === 1;
-      const isLastLine = j === paragraph.lines.length - 1;
-
-      const isLastLineButNotOnlyLine = isLastLine && !isOnlyLine;
-
-      let endOffsetDelta = isOnlyLine ? 1 : isLastLineButNotOnlyLine ? 1 : 0;
+      // Don't forget the newline character at the end of the paragraph
+      const isEndOfParagraph = cursorPosition === paragraph.offset + paragraph.length - 1;
+      const endOffsetDelta = isEndOfParagraph ? 1 : 0;
 
       // Allow cursor to be positioned at the end of any line, including trailing whitespace
       // Use <= instead of < to include the position exactly at the end of the line
       if (
         cursorOffsetInParagraph >= line.offset &&
-        cursorOffsetInParagraph <= line.offset + line.length + endOffsetDelta
+        cursorOffsetInParagraph < line.offset + line.length + endOffsetDelta
       ) {
         lineIndex = j;
         break;
@@ -350,6 +353,7 @@ export class CursorManager {
 
     // Handle empty line quickly
     if (!line.text || line.text.length === 0) {
+      console.log('Empty line, moving to start of line');
       const newPos = targetParagraph.offset + line.offset;
       if (moveCursor) {
         // Find the correct page for this empty line
@@ -431,6 +435,7 @@ export class CursorManager {
 
     const newPos = targetParagraph.offset + targetParagraph.lines[targetLine].offset + charIndex;
     if (moveCursor) {
+      // TODO: check this part of the code, it seems complex for something that should be simple
       // Calculate the page index for the new position
       const pages = this.textParser.getPages();
       let newPageIndex = -1; // Start with invalid page to detect if we find one
@@ -475,6 +480,13 @@ export class CursorManager {
           console.warn('Last resort: Using current page index', newPageIndex);
         }
       }
+
+      console.log(
+        `Moving cursor ${direction} to paragraph ${targetParagraphIndex}, line ${targetLine}, char ${charIndex} (page ${newPageIndex})`,
+      );
+
+      // log line text
+      console.log('Line text:', JSON.stringify(line.text));
 
       this.structurePosition = {
         pageIndex: newPageIndex,

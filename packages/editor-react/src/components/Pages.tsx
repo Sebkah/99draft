@@ -39,22 +39,22 @@ const Pages = ({ editor, canvasRefs }: PagesProps) => {
       // Clean up the canvas refs array to match the current page count
       // This prevents stale null references when page count decreases
       canvasRefs.current = canvasRefs.current.slice(0, numberOfPages);
-
+      /* 
       console.log(
         'Linking canvases:',
         canvasRefs.current.length,
         'canvases for',
         numberOfPages,
         'pages',
-      );
+      ); */
 
       // All canvases should be ready at this point - link them directly
       editor.linkCanvases(canvasRefs.current as HTMLCanvasElement[], true);
-      console.log(
+      /*   console.log(
         'Linked canvases after page count change:',
         canvasRefs.current.length,
         'canvases',
-      );
+      ); */
     }
   }, [numberOfPages, editor, canvasRefs]);
 

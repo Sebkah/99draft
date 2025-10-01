@@ -14,15 +14,10 @@ interface RulerProps {
  * Ruler component with draggable margin pins
  * Displays a horizontal ruler with measurement marks and draggable pins for setting margins
  */
-const Ruler: React.FC<RulerProps> = ({
-  width,
-  editor,
-  defaultLeftMargin = 100,
-  defaultRightMargin = 100,
-}) => {
+const Ruler: React.FC<RulerProps> = ({ width, editor }) => {
   // Internal state for margins
-  const [leftMargin, setLeftMargin] = useState<number>(defaultLeftMargin);
-  const [rightMargin, setRightMargin] = useState<number>(defaultRightMargin);
+  const [leftMargin, setLeftMargin] = useState<number>(editor.margins.left);
+  const [rightMargin, setRightMargin] = useState<number>(editor.margins.right);
 
   // single dragging state: 'left' | 'right' | null
   const [dragging, setDragging] = useState<'left' | 'right' | null>(null);
