@@ -129,7 +129,11 @@ export class TextRenderer {
   }
 
   // Render debug information for paragraphs, lines, and cursor position
-  private renderDebugInfo(ctx: CanvasRenderingContext2D, lineHeight: number): void {
+  private renderDebugInfo(
+    ctx: CanvasRenderingContext2D,
+    lineHeight: number,
+    pageIndex: number,
+  ): void {
     // Save the current context state to avoid interference with main text rendering
     ctx.save();
 
@@ -140,11 +144,18 @@ export class TextRenderer {
     ctx.fillStyle = 'blue';
     ctx.font = '12px Arial';
 
+    const page = this.textParser.getPages()[pageIndex];
+
     const paragraphs = this.textParser.getParagraphs();
     const position = ctx.canvas.width - this.editor.margins.right;
 
     ctx.translate(0, lineHeight + this.editor.margins.top); // Start below top margin
     paragraphs.forEach((paragraph, pindex) => {
+      // Only render paragraphs that are on the current page
+      if (pindex > page.endParagraphIndex || pindex < page.startParagraphIndex) {
+        return;
+      }
+
       // Highlight hovered paragraph area (always, regardless of debug text toggle)
       if (this.hoveredParagraphIndex === pindex) {
         const left = this.editor.margins.left - 2;
@@ -344,6 +355,6 @@ export class TextRenderer {
     ctx.restore();
 
     // Always render debug overlay pass (will only show text if enabled)
-    this.renderDebugInfo(ctx, lineHeight);
+    this.renderDebugInfo(ctx, lineHeight, pageIndex);
   }
 }

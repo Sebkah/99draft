@@ -307,7 +307,20 @@ export class Editor {
     // If it's not just one letter
     const parts = text.split('\n');
 
+    const selection = this.selectionManager.getSelection();
+    if (selection) {
+      // If there's a selection, delete it first
+      const { start, end } = selection;
+      const selectionLength = end - start;
+      this.pieceTable.delete(start, selectionLength);
+      this.textParser.deleteTextRangeDirectly(start, selectionLength);
+      this.textParser.splitParagraphsIntoPages();
+      this.cursorManager.setCursorPosition(start);
+      this.selectionManager.clearSelection();
+    }
+
     if (parts.length > 1) {
+      //XXX: this is good but this will rerender the text multiple times
       // Split it around the line breaks
       // Insert each part separately with line breaks in between
       parts.forEach((part, index) => {
@@ -337,49 +350,75 @@ export class Editor {
 
   //TODO: this should also do partial reparsing, but we need to be carefull if we delete newlines
   deleteText(length: number): void {
+    const currentPosition = this.cursorManager.getPosition();
+
+    const selection = this.selectionManager.getSelection();
+
+    // Case 1: If there's a selection, delete it
+    if (selection) {
+      const { start, end } = selection;
+      const selectionLength = end - start;
+      this.pieceTable.delete(start, selectionLength);
+      this.textParser.deleteTextRangeDirectly(start, selectionLength);
+      this.textParser.splitParagraphsIntoPages();
+      this.cursorManager.setCursorPosition(start);
+      this.selectionManager.clearSelection();
+      this.renderPages();
+      this.emitDebugUpdate();
+      return;
+    }
+
+    // Case 2: No selection, delete before cursor
+    // Validate position bounds
+    if (currentPosition - length < 0) {
+      console.warn('Delete operation would exceed text bounds, adjusting length');
+      length = currentPosition;
+    }
+
     if (length === 0) {
       console.warn('Delete length is 0, no operation performed');
       return;
     }
-    const currentPosition = this.cursorManager.getPosition();
 
-    // Case 1: If there's a selection, delete it
+    // Delete the text first
+    this.pieceTable.delete(currentPosition - length, length);
 
-    // Case 2: No selection, delete before cursor
     // Case 2.1: Only one character
-
-    
-
-    if (currentPosition > 0) {
-      // Validate position bounds
-      if (currentPosition - length < 0) {
-        console.warn('Delete operation would exceed text bounds, adjusting length');
-        length = currentPosition;
-      }
+    // If deleting only one character
+    if (length === 1) {
       // Check if we are deleting a newline character
       const charBefore = this.pieceTable.getRangeText(currentPosition - 1, 1);
-
-      // Delete the text first
-      this.pieceTable.delete(currentPosition - 1, length);
-
-      if (charBefore === '\n') {
-        // Merge paragraphs
-        this.textParser.mergeParagraphsAtLineBreak(currentPosition - 1); // Pass position of deleted newline
-      } else {
-        // For regular character deletion, re-parse the affected paragraph
-        // Similar to how insertText handles regular text insertion
-        this.textParser.reparseParagraph(Math.max(0, currentPosition - length), -length);
-      }
-
-      this.textParser.splitParagraphsIntoPages();
-
-      // Ensure cursor position is valid before setting it
-      const newCursorPos = Math.max(0, Math.min(this.pieceTable.length, currentPosition - length));
-      this.cursorManager.setCursorPosition(newCursorPos);
-
-      this.renderPages();
-      this.emitDebugUpdate();
+      // Merge the paragraphs if a newline was deleted
+      if (charBefore === '\n') this.textParser.mergeParagraphsAtLineBreak(currentPosition - 1);
+      else this.textParser.reparseParagraph(currentPosition, -1);
     }
+    // Case 2.2: Multiple characters
+    else {
+      this.textParser.deleteTextRangeDirectly(currentPosition - length, length);
+    }
+
+    // Re-split paragraphs into pages
+    this.textParser.splitParagraphsIntoPages();
+
+    // Ensure cursor position is valid before setting it
+    const newCursorPos = Math.max(0, Math.min(this.pieceTable.length, currentPosition - length));
+    this.cursorManager.setCursorPosition(newCursorPos);
+
+    this.renderPages();
+    this.emitDebugUpdate();
+  }
+
+  deleteTextRange(start: number, length: number): void {
+    if (length <= 0) {
+      console.warn('Delete range length is 0 or negative, no operation performed');
+      return;
+    }
+
+    this.textParser.deleteTextRangeDirectly(start, length);
+    this.textParser.splitParagraphsIntoPages();
+
+    // Move cursor to start of deleted range
+    this.cursorManager.setCursorPosition(start);
   }
 
   insertLineBreak(): void {
@@ -390,6 +429,9 @@ export class Editor {
     }
 
     const currentPosition = this.cursorManager.getPosition();
+
+    // Insert the newline character
+    this.pieceTable.insert('\n', currentPosition);
 
     // Split paragraph at the position
     this.textParser.splitParagraphDirectly(currentPosition);

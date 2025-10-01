@@ -6,7 +6,7 @@ import { OptionalExportHandlers, ExportEventManager } from '../types/ExportHandl
 import { useExportHandlers } from '../hooks/useExportHandlers';
 
 import { useEffect, useRef, useState } from 'react';
-import { baseTextSimple } from '../assets/baseText';
+import { baseText, baseTextSimple } from '../assets/baseText';
 import DebugPanel from './DebugPanel';
 
 const editorWidth = 800;
@@ -32,8 +32,8 @@ const TextEditor = ({ exportHandlers, exportEventManager }: TextEditorProps = {}
 
   const [editor] = useState<Editor>(
     new Editor(
-      baseTextSimple,
-      { left: 100, right: 400, top: 50 }, // Default margins that will be overridden by Ruler
+      baseText,
+      { left: 100, right: 200, top: 50 }, // Default margins that will be overridden by Ruler
       editorWidth,
       editorHeight,
     ),

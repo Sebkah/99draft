@@ -478,8 +478,7 @@ export class TextParser {
     //    paragraphs and the offset of the second paragraph.
     // - getRangeText(start, length) retrieves text from the piece table, where length is inclusive.
 
-    // Insert the newline character
-    this.pieceTable.insert('\n', cursorPosition);
+
 
     const paragraphIndex = this.findParagraphIndexAtOffset(cursorPosition);
 
@@ -512,7 +511,7 @@ export class TextParser {
     const newParagraph = new Paragraph(secondPartText, cursorPosition + 1);
     newParagraph.setLength(secondPartText.length + 1); // +1 for the already existing newline
 
-    console.log('New paragraph created with text:', JSON.stringify(secondPartText));
+    /*     console.log('New paragraph created with text:', JSON.stringify(secondPartText)); */
 
     // Insert the new paragraph into the array right after the current one
     this.paragraphs.splice(paragraphIndex + 1, 0, newParagraph);
@@ -572,6 +571,89 @@ export class TextParser {
 
     // Re-parse the merged paragraph into lines since its content changed
     this.splitParagraphIntoLines(beforeParagraphIndex);
+  }
+
+  /**
+   * Delete a range of text that may span multiple paragraphs.
+   * This is a fast path for handling multi-character deletions (e.g., selection deletions).
+   * It updates the piece table, merges affected paragraphs, and re-parses the result.
+   *
+   * @param start - Character offset where the deletion begins.
+   * @param length - Number of characters to delete.
+   *
+   * Algorithm:
+   * 1. Delete from piece table
+   * 2. If within single paragraph, use simple reparse
+   * 3. If spanning multiple paragraphs:
+   *    - Keep text before deletion start from first paragraph
+   *    - Keep text after deletion end from last paragraph
+   *    - Merge into first paragraph
+   *    - Remove all intermediate and last paragraphs
+   *    - Shift subsequent paragraph offsets
+   */
+  public deleteTextRangeDirectly(start: number, length: number): void {
+    if (length <= 0) {
+      console.warn('Delete range length is 0 or negative, no operation performed');
+      return;
+    }
+
+    const startParagraphIndex = this.findParagraphIndexAtOffset(start);
+    const endParagraphIndex = this.findParagraphIndexAtOffset(start + length - 1);
+
+    if (startParagraphIndex === -1 || endParagraphIndex === -1) {
+      console.warn('Invalid start or end position for deletion:', start, length);
+      return;
+    }
+
+    // Simple case: deletion within a single paragraph
+    if (startParagraphIndex === endParagraphIndex) {
+      this.reparseParagraph(start, -length);
+      return;
+    }
+
+    // Complex case: deletion spans multiple paragraphs
+    // Capture paragraph references before any modifications to the array
+    const startParagraph = this.paragraphs[startParagraphIndex];
+    const endParagraph = this.paragraphs[endParagraphIndex];
+
+    // Calculate how much text to keep from each boundary paragraph
+    // keepFromStart: characters before the deletion point in the start paragraph
+    const keepFromStart = start - startParagraph.offset;
+
+    // keepFromEnd: characters after the deletion endpoint in the end paragraph
+    // Note: The piece table has already been modified, so we calculate based on original positions
+    const deletionEnd = start + length;
+    const keepFromEnd = Math.max(0, endParagraph.offset + endParagraph.length - deletionEnd);
+
+    console.log(
+      `Merging paragraphs ${startParagraphIndex}-${endParagraphIndex}: keeping ${keepFromStart} chars from start, ${keepFromEnd} chars from end`,
+    );
+
+    // The merged paragraph's total length (including trailing newline if present)
+    const newLength = keepFromStart + keepFromEnd;
+
+    // Retrieve the merged text from the piece table (which has already been modified)
+    const newText = this.pieceTable.getRangeText(startParagraph.offset, newLength);
+
+    // Update the start paragraph with the merged content
+    startParagraph.updateText(newText);
+    startParagraph.setLength(newLength);
+
+    // Remove all paragraphs from (start+1) through end (inclusive)
+    // This is a single operation that removes all intermediate paragraphs plus the end paragraph
+    const paragraphsToRemove = endParagraphIndex - startParagraphIndex;
+    if (paragraphsToRemove > 0) {
+      this.paragraphs.splice(startParagraphIndex + 1, paragraphsToRemove);
+    }
+
+    // Shift offsets for all subsequent paragraphs
+    // They all move backward by the length of the deletion
+    for (let i = startParagraphIndex + 1; i < this.paragraphs.length; i++) {
+      this.paragraphs[i].shiftOffset(-length);
+    }
+
+    // Re-parse the merged paragraph into lines
+    this.splitParagraphIntoLines(startParagraphIndex);
   }
 
   public getParagraph(index: number): Paragraph | null {
