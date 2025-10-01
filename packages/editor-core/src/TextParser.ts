@@ -231,7 +231,7 @@ export class TextParser {
     if (!paragraph) return;
 
     // Update paragraph length
-    paragraph.updateText(this.pieceTable.getRangeText(paragraph.offset, paragraph.length), false);
+    paragraph.updateText(this.pieceTable.getRangeText(paragraph.offset, paragraph.length));
     paragraph.adjustLength(editLength);
 
     // Shift offsets for all subsequent paragraphs
@@ -448,40 +448,59 @@ export class TextParser {
   }
 
   /**
+   * This method handles splitting a paragraph into two at the given cursor position.
+   * It's a fast path for handling Enter key presses.
+   * It updates the piece table, paragraph list, and re-parses the affected paragraphs into lines.
    *
-   * Use AFTER inserting a newline into the piece table at the cursor position.
-   * This will split the paragraph at the cursor into two paragraphs without recomputing all paragraphs.
    *
-   * Catch: the linebreaks never appear in the text of the paragraph, they are just counted in the length.
+   *
    *
    * @param cursorPosition - Character offset just after the newline was inserted.
    */
-  public splitParagraph(cursorPosition: number): void {
-    const paragraphIndex = this.findParagraphIndexAtOffset(cursorPosition - 1); // -1 to get the paragraph before the newline
-    console.log('Splitting paragraph at index:', paragraphIndex, 'cursorPosition:', cursorPosition);
+  public splitParagraphDirectly(cursorPosition: number): void {
+    // Key implementation considerations:
+    // - To reproduce the operation of splitIntoParagraphs, linebreaks need to be
+    //    counted in the length but not inserted into the actual paragraph.text.
+    // - Order of operation : Since the editor updates the cursor position AFTER
+    //    calling this function, the cursor is behind the inserted linebreak currently.
+    // - We need to take both those points into consideration when splitting the text, updating the length of the
+    //    paragraphs and the offset of the second paragraph.
+    // - getRangeText(start, length) retrieves text from the piece table, where length is inclusive.
+
+    const paragraphIndex = this.findParagraphIndexAtOffset(cursorPosition);
 
     const currentParagraph = this.paragraphs[paragraphIndex];
 
-    const firstPartText = this.pieceTable.getRangeText(
-      currentParagraph.offset,
-      cursorPosition - currentParagraph.offset - 1, // we substract 1 to exclude the newline just inserted in the piece table
-    );
+    const offsetInParagraph = cursorPosition - currentParagraph.offset;
 
-    const secondPartText = this.pieceTable.getRangeText(
-      cursorPosition,
-      currentParagraph.length - (cursorPosition - currentParagraph.offset), // No +1 here, we count the newline in the length but don't include it in the actual text of the line
-    );
-    /*   console.log('Second part', JSON.stringify(secondPartText)); */
+    // ┌─────────────────────────────────────────────────────────┐
+    // │  offset=10         cursor=24   cursor+1=25              │
+    // │  ↓                   ↓        ↓                         │
+    // │  "Hello world, this" [newline] " is a test"             │
+    // │  └─ offsetInParagraph=14 ─┘    └─ remaining text ─┘     │
+    // └─────────────────────────────────────────────────────────┘
 
-    currentParagraph.updateText(firstPartText, false);
+    // First part from start of paragraph up to the cursor (which is before the linebreak)
+    const firstPartText = this.pieceTable.getRangeText(currentParagraph.offset, offsetInParagraph);
+
+    // Update the current paragraph with the first part of the text
+    currentParagraph.updateText(firstPartText);
     currentParagraph.setLength(Math.max(0, firstPartText.length + 1)); // +1 for the newline just added
 
-    // Insert a new paragraph after the current one with the second part of the text
-    const newParagraph = new Paragraph(secondPartText, cursorPosition);
-    newParagraph.setLength(secondPartText.length + 1); // +1 for the newline in the length
+    // Second part from just after the linebreak (because we don't insert it into text) to the end of the paragraph
+    const secondPartText = this.pieceTable.getRangeText(
+      cursorPosition + 1,
+      currentParagraph.length - offsetInParagraph - 1, //   Why -1? Original length includes the paragraph's trailing newline.
+    );
+
+    // New paragraph with the second part of the text
+    const newParagraph = new Paragraph(secondPartText, cursorPosition + 1); // the offset is cursorPosition + 1 to account for the newline
+    newParagraph.setLength(secondPartText.length + 1); // +1 for the already existing newline
+
+    // Insert the new paragraph into the array right after the current one
     this.paragraphs.splice(paragraphIndex + 1, 0, newParagraph);
 
-    // Shift offsets for all subsequent paragraphs of 1 for the added newline
+    // Shift offsets for all subsequent paragraphs by +1 (to account for the added newline)
     for (let i = paragraphIndex + 2; i < this.paragraphs.length; i++) {
       this.paragraphs[i].shiftOffset(1);
     }
@@ -509,7 +528,7 @@ export class TextParser {
       newLength > 0 ? this.pieceTable.getRangeText(currentParagraph.offset, newLength) : '';
 
     // Update the current paragraph with the merged content
-    currentParagraph.updateText(text, false);
+    currentParagraph.updateText(text);
     currentParagraph.setLength(newLength); // -1 for the removed newline
 
     // Shift offsets for all subsequent paragraphs (-1 for the removed newline)

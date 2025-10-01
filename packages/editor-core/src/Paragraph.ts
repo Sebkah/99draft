@@ -37,9 +37,9 @@ export class Paragraph {
   }
 
   // Utility methods
-  public updateText(newText: string, updateLength: boolean): void {
+  public updateText(newText: string): void {
     this.paragraphText = newText;
-    if (updateLength) this.paragraphLength = newText.length;
+
   }
 
   public adjustLength(delta: number): void {

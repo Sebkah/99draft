@@ -367,23 +367,11 @@ export class Editor {
       }
 
       const paragraphAtCursor = this.textParser.findParagraphIndexAtOffset(currentPos);
-      const totalParagraphs = this.textParser.getParagraphs().length;
+   
 
       // Check if we are deleting a newline character
       const charBefore = this.pieceTable.getRangeText(currentPos - 1, 1);
-
-      if (charBefore === '\n') {
-        // Validate paragraph indices before merging
-        if (paragraphAtCursor <= 0 || paragraphAtCursor >= totalParagraphs) {
-          console.error('Invalid paragraph indices for merge:', {
-            paragraphAtCursor,
-            totalParagraphs,
-            currentPos,
-          });
-          return;
-        }
-      }
-
+   
       // Delete the text first
       this.pieceTable.delete(currentPos - 1, length);
 
@@ -439,20 +427,12 @@ export class Editor {
     // Insert the newline character
     this.pieceTable.insert('\n', currentPosition);
 
-    
-    // Update cursor position first (after the newline)
-    this.cursorManager.moveRight(1);
-    // Update paragraph styles FIRST, before splitting the paragraph text
-    // This ensures the new paragraph has the correct styles when splitParagraphIntoLines is called
-    /* this.paragraphStylesManager.splitParagraph(originalParagraphIndex); */
-    
-    // Split paragraph at the position, after the line break
-    this.textParser.splitParagraph(this.cursorManager.getPosition());
+    // Split paragraph at the position
+    this.textParser.splitParagraphDirectly(currentPosition);
 
     this.textParser.splitParagraphsIntoPages();
 
-    // Update cursor structure mapping after paragraph split
-    this.cursorManager.mapLinearToStructure();
+    this.cursorManager.moveRight(1);
 
     this.renderPages();
     this.emitDebugUpdate();
