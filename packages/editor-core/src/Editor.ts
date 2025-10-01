@@ -380,20 +380,20 @@ export class Editor {
       return;
     }
 
-    // Delete the text first
-    this.pieceTable.delete(currentPosition - length, length);
-
     // Case 2.1: Only one character
     // If deleting only one character
     if (length === 1) {
       // Check if we are deleting a newline character
       const charBefore = this.pieceTable.getRangeText(currentPosition - 1, 1);
+      // Delete the text first
+      this.pieceTable.delete(currentPosition - 1, length);
       // Merge the paragraphs if a newline was deleted
       if (charBefore === '\n') this.textParser.mergeParagraphsAtLineBreak(currentPosition - 1);
       else this.textParser.reparseParagraph(currentPosition, -1);
     }
     // Case 2.2: Multiple characters
     else {
+      this.pieceTable.delete(currentPosition - length, length);
       this.textParser.deleteTextRangeDirectly(currentPosition - length, length);
     }
 
