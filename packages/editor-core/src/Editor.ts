@@ -301,72 +301,109 @@ export class Editor {
     return this.textParser;
   }
 
-  //TODO: enable inserting and deleting at arbitrary positions
+  /**
+   * Internal method to insert text without triggering render
+   * Used by other operations that will handle rendering themselves
+   * Note: Does NOT update page structure - caller must call splitParagraphsIntoPages()
+   * @param text - Text to insert
+   * @param position - Optional position to insert at (defaults to cursor position)
+   */
+  private insertTextInternal(text: string, position?: number): void {
+    const currentPosition = position
+      ? this.cursorManager.clampLinearPosition(position)
+      : this.cursorManager.getPosition();
 
-  insertText(text: string): void {
-    // If it's not just one letter
-    const parts = text.split('\n');
-
-    const selection = this.selectionManager.getSelection();
-    if (selection) {
-      // If there's a selection, delete it first
-      const { start, end } = selection;
-      const selectionLength = end - start;
-      this.pieceTable.delete(start, selectionLength);
-      this.textParser.deleteTextRangeDirectly(start, selectionLength);
-      this.textParser.splitParagraphsIntoPages();
-      this.cursorManager.setCursorPosition(start);
-      this.selectionManager.clearSelection();
-    }
-
-    if (parts.length > 1) {
-      //XXX: this is good but this will rerender the text multiple times
-      // Split it around the line breaks
-      // Insert each part separately with line breaks in between
-      parts.forEach((part, index) => {
-        if (part.length > 0) {
-          this.insertText(part);
-        }
-        // Insert line break between parts (if not the last part)
-        if (index < parts.length - 1) {
-          this.insertLineBreak();
-        }
-      });
-      return;
-    }
-
-    const cursorPosition = this.cursorManager.getPosition();
-
-    this.pieceTable.insert(text, cursorPosition);
-    this.textParser.reparseParagraph(cursorPosition, text.length);
-
-    this.textParser.splitParagraphsIntoPages();
-
+    this.pieceTable.insert(text, currentPosition);
+    this.textParser.reparseParagraph(currentPosition, text.length);
     this.cursorManager.moveRight(text.length);
+  }
 
+  /**
+   * Internal method to insert line break without triggering render
+   * Used by other operations that will handle rendering themselves
+   * Note: Does NOT update page structure - caller must call splitParagraphsIntoPages()
+   * @param position - Optional position to insert at (defaults to cursor position)
+   */
+  private insertLineBreakInternal(position?: number): void {
+    const currentPosition = position
+      ? this.cursorManager.clampLinearPosition(position)
+      : this.cursorManager.getPosition();
+
+    this.pieceTable.insert('\n', currentPosition);
+    this.textParser.splitParagraphDirectly(currentPosition);
+    this.cursorManager.moveRight(1);
+  }
+
+  /**
+   * Insert a line break at cursor position or specified position
+   * Triggers rerender after insertion
+   * @param position - Optional position to insert at (defaults to cursor position)
+   */
+  insertLineBreak(position?: number): void {
+    // Handle selection deletion if there's a selection
+    if (this.selectionManager.hasSelection()) {
+      this.deleteSelectionInternal();
+    }
+
+    this.insertLineBreakInternal(position);
+    this.textParser.splitParagraphsIntoPages();
     this.renderPages();
     this.emitDebugUpdate();
   }
 
-  //TODO: this should also do partial reparsing, but we need to be carefull if we delete newlines
-  deleteText(length: number): void {
-    const currentPosition = this.cursorManager.getPosition();
+  /**
+   * Insert text at cursor position or specified position
+   * Handles multi-line text and triggers rerender after insertion
+   * @param text - Text to insert (can contain newlines)
+   * @param position - Optional position to insert at (defaults to cursor position)
+   */
+  insertText(text: string, position?: number): void {
+    const parts = text.split('\n');
 
-    const selection = this.selectionManager.getSelection();
+    // First delete selection if there's one (internal, no render)
+    this.deleteSelectionInternal();
 
-    // Case 1: If there's a selection, delete it
-    if (selection) {
-      const { start, end } = selection;
-      const selectionLength = end - start;
-      this.pieceTable.delete(start, selectionLength);
-      this.textParser.deleteTextRangeDirectly(start, selectionLength);
+    // If there are line breaks, handle each part separately
+    if (parts.length > 1) {
+      // Insert each part separately with line breaks in between
+      parts.forEach((part, index) => {
+        if (part.length > 0) {
+          this.insertTextInternal(part, position);
+        }
+        // Insert line break between parts (if not the last part)
+        if (index < parts.length - 1) {
+          this.insertLineBreakInternal(position);
+        }
+      });
+      // Update page structure once after all insertions
       this.textParser.splitParagraphsIntoPages();
-      this.cursorManager.setCursorPosition(start);
-      this.selectionManager.clearSelection();
+      // Render once after all insertions
       this.renderPages();
       this.emitDebugUpdate();
       return;
     }
+
+    // Single line insertion
+    this.insertTextInternal(text, position);
+    // Update page structure before rendering
+    this.textParser.splitParagraphsIntoPages();
+    this.renderPages();
+    this.emitDebugUpdate();
+  }
+
+  /**
+   * Deletes the specified number of characters before the cursor or before a given position.
+   *
+   * For now this will clear any selection first if there's one.
+   *
+   *
+   * **/
+  deleteTextBefore(length: number, position?: number): void {
+    this.selectionManager.clearSelection();
+
+    const currentPosition = position
+      ? this.cursorManager.clampLinearPosition(position)
+      : this.cursorManager.getPosition();
 
     // Case 2: No selection, delete before cursor
     // Validate position bounds
@@ -408,40 +445,40 @@ export class Editor {
     this.emitDebugUpdate();
   }
 
-  deleteTextRange(start: number, length: number): void {
-    if (length <= 0) {
-      console.warn('Delete range length is 0 or negative, no operation performed');
-      return;
+  /**
+   * Internal method to delete selection without triggering render
+   * Used by other operations that will handle rendering themselves
+   * Note: Does NOT update page structure - caller must call splitParagraphsIntoPages()
+   * @returns true if selection was deleted, false if no selection existed
+   */
+  private deleteSelectionInternal(): boolean {
+    const selection = this.selectionManager.getSelection();
+    if (!selection) {
+      return false;
     }
-
-    this.textParser.deleteTextRangeDirectly(start, length);
-    this.textParser.splitParagraphsIntoPages();
-
-    // Move cursor to start of deleted range
+    const { start, end } = selection;
+    const selectionLength = end - start;
+    this.pieceTable.delete(start, selectionLength);
+    this.textParser.deleteTextRangeDirectly(start, selectionLength);
     this.cursorManager.setCursorPosition(start);
+    this.selectionManager.clearSelection();
+
+    return true;
   }
 
-  insertLineBreak(): void {
-    // Handle selection deletion if there's a selection
-    if (this.selectionManager.hasSelection()) {
-      console.warn('Inserting line break with active selection is not supported yet');
-      return;
+  /**
+   * Public API to delete the current selection
+   * Triggers rerender after deletion
+   * @returns true if selection was deleted, false if no selection existed
+   */
+  deleteSelection(): boolean {
+    const result = this.deleteSelectionInternal();
+    if (result) {
+      this.textParser.splitParagraphsIntoPages();
+      this.renderPages();
+      this.emitDebugUpdate();
     }
-
-    const currentPosition = this.cursorManager.getPosition();
-
-    // Insert the newline character
-    this.pieceTable.insert('\n', currentPosition);
-
-    // Split paragraph at the position
-    this.textParser.splitParagraphDirectly(currentPosition);
-
-    this.textParser.splitParagraphsIntoPages();
-
-    this.cursorManager.moveRight(1);
-
-    this.renderPages();
-    this.emitDebugUpdate();
+    return result;
   }
 
   /**
@@ -493,14 +530,6 @@ export class Editor {
    */
   public exportToDocx(): any {
     return this.docxRenderer.generateDocxDocument();
-  }
-
-  /**
-   * Export the current document as a simple DOCX Document object
-   * Returns a simplified Document object for basic exports
-   */
-  public exportToSimpleDocx(): any {
-    return this.docxRenderer.generateSimpleDocxDocument();
   }
 
   /**

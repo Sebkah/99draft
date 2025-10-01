@@ -111,7 +111,22 @@ export class InputManager {
 
     // Handle Backspace key
     if (event.key === 'Backspace') {
-      this.editor.deleteText(1);
+      // If there's a selection, delete it
+      if (this.editor.deleteSelection()) {
+        return true;
+      }
+
+      this.editor.deleteTextBefore(1);
+      return true;
+    }
+
+    // Handle Delete key
+    if (event.key === 'Delete') {
+      // If there's a selection, delete it
+      if (this.editor.deleteSelection()) {
+        return true;
+      }
+      this.editor.deleteTextBefore(1, this.cursorManager.getPosition() + 1);
       return true;
     }
 
@@ -124,6 +139,14 @@ export class InputManager {
     // Handle paste (Ctrl+V)
     if (event.ctrlKey && event.key === 'v') {
       this.handlePaste();
+      return true;
+    }
+
+    // Handle cut (Ctrl+X)
+    if (event.ctrlKey && event.key === 'x') {
+      this.handleCopy().then(() => {
+        this.editor.deleteSelection();
+      });
       return true;
     }
 

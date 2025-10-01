@@ -56,7 +56,7 @@ export class CursorManager {
   }
 
   public setCursorPosition(position: number): void {
-    const clampedPosition = Math.max(0, Math.min(position, this.editor.getPieceTable().length)); //ugly, find a solution
+    const clampedPosition = this.clampLinearPosition(position); //ugly, find a solution
 
     // Log the character at the clamped position as a JSON string for safer inspection
 
@@ -70,6 +70,10 @@ export class CursorManager {
     if (this.selectionManager) {
       (this.selectionManager as any).clearSelection();
     }
+  }
+
+  public clampLinearPosition(position: number): number {
+    return Math.max(0, Math.min(position, this.editor.getPieceTable().length));
   }
 
   public moveLeft(amount: number): void {

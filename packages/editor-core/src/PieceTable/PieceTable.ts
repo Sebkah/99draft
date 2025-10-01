@@ -362,6 +362,7 @@ export class PieceTable {
     if (start < 0) {
       throw new Error('Delete: start position cannot be negative');
     }
+    //XXX: should it be > ?
     if (start >= this.documentLength) {
       throw new Error('Delete: start position out of bounds');
     }
