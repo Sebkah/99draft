@@ -1,14 +1,21 @@
-Minor
+# TODO
 
-- review exporters
-- optimize page calculations (by checking offsets instead of reparsing)
+## 🔧 Minor
 
-Major :
+- Review exporters
+- Optimize page calculations (check offsets instead of reparsing)
 
-- styleManager
-- partial rendering
+## 🚀 Major
 
-Bugs :
+- Implement styleManager
+- Add partial rendering of pages
 
-- insertion at the end of the document
-- globally handling of the end of the doc
+## 🐛 Bugs
+
+- Fix insertion at the end of document
+- Handle end of document globally
+  - Check bounds handling in piece table
+
+## ♻️ Refactors
+
+- Separate Editor concerns: interaction vs. pure text handling logic

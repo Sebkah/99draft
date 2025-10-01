@@ -1,34 +1,52 @@
 # 99draft
 
-An Electron application with React and TypeScript
+An experimenter into making a text editor. 
 
-## Recommended IDE Setup
+## Overview
 
-- [VSCode](https://code.visualstudio.com/) + [ESLint](https://marketplace.visualstudio.com/items?itemName=dbaeumer.vscode-eslint) + [Prettier](https://marketplace.visualstudio.com/items?itemName=esbenp.prettier-vscode)
+The architecture is split into three distinct layers:
 
-## Project Setup
+### 📦 Project Structure
 
-### Install
+This is a **monorepo** containing three main packages:
 
-```bash
-$ pnpm install
-```
+#### **`@99draft/editor-core`** - Core Editor Engine
 
-### Development
+The framework-agnostic editor engine that handles all text editing logic. While it depends on the Canvas API for rendering, it's otherwise independent of UI frameworks. This package includes:
 
-```bash
-$ pnpm dev
-```
+- Piece table data structure for efficient text manipulation
+- Cursor and selection management
+- Text parsing and formatting
+- Document rendering (DOCX, PDF, Canvas)
 
-### Build
+#### **`@99draft/editor-react`** - React Component Library
 
-```bash
-# For windows
-$ pnpm build:win
+React components that provide a complete UI for the editor, styled with Tailwind CSS. This layer wraps the core engine with a modern, responsive interface including:
 
-# For macOS
-$ pnpm build:mac
+- Page and paragraph components
+- Debug panel for development
+- Ruler
+- Export handlers and hooks
 
-# For Linux
-$ pnpm build:linux
-```
+#### **`apps/desktop`** - Electron Desktop Application
+
+A cross-platform desktop application that consumes the React library
+
+---
+
+## 🚧 Project Status
+
+**This project is currently under active development and is incomplete.**
+
+---
+
+## 📄 License
+
+This project is licensed under the [Creative Commons Attribution-Non Commercial-ShareAlike 4.0 International License (CC BY-NC-SA 4.0)](https://creativecommons.org/licenses/by-nc-sa/4.0/).
+
+**What this means:**
+
+- ✅ You can use, modify, and share this project
+- ✅ You must give appropriate credit
+- ✅ Any derivative works must use the same license
+- ❌ You cannot use this project for commercial purposes
