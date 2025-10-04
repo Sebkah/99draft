@@ -1,4 +1,5 @@
-import { Editor } from '..';
+import { Editor, EventEmitter } from '..';
+import { ParagraphStylesManagerEvents } from './ParagraphEvents';
 
 export type ParagraphStyle = {
   marginLeft: number;
@@ -7,7 +8,7 @@ export type ParagraphStyle = {
   lineHeight?: number;
 };
 
-export class ParagraphStylesManager {
+export class ParagraphStylesManager extends EventEmitter<ParagraphStylesManagerEvents> {
   private editor: Editor;
 
   // Native sparse array: undefined holes for paragraphs with default styles
@@ -15,6 +16,7 @@ export class ParagraphStylesManager {
   styles: (Partial<ParagraphStyle> | undefined)[] = [];
 
   constructor(editor: Editor, initialStyles?: (Partial<ParagraphStyle> | undefined)[]) {
+    super();
     this.editor = editor;
     if (initialStyles) {
       // JavaScript spread preserves sparseness naturally
@@ -66,6 +68,15 @@ export class ParagraphStylesManager {
       // Merge with existing styles, keeping old values if not set again
       const existingStyles = this.styles[paragraphIndex] || {};
       this.styles[paragraphIndex] = { ...existingStyles, ...styles };
+
+      
+      // Emit event for any listeners (e.g. UI updates)
+      if (styles.align) {
+        this.emit('paragraphAlignChange', {
+          paragraphIndex,
+          align: styles.align,
+        });
+      }
     }
   }
 

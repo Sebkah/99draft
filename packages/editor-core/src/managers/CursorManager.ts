@@ -32,7 +32,11 @@ export class CursorManager extends EventEmitter<CursorManagerEvents> {
   private editor: Editor;
   private selectionManager?: SelectionManager;
 
-  private measureText: (text: string) => TextMetrics;
+  private ctx: CanvasRenderingContext2D;
+
+  private get measureText (): (text: string) => TextMetrics {
+    return this.ctx.measureText.bind(this.ctx);
+  }
 
   constructor(
     initialPosition: number = 0,
@@ -44,7 +48,8 @@ export class CursorManager extends EventEmitter<CursorManagerEvents> {
     this.linearPosition = initialPosition;
     this.textParser = textParser;
     this.editor = editor;
-    this.measureText = ctx.measureText.bind(ctx);
+    this.ctx = ctx;
+
     this.mapLinearToStructure();
   }
 

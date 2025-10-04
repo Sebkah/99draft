@@ -54,6 +54,11 @@ export class TextParser extends EventEmitter<TextParserEvents> {
 
     this.paragraphStylesManager = editor.paragraphStylesManager;
 
+    this.paragraphStylesManager.on('paragraphAlignChange', (event) => {
+      /*       const { paragraphIndex } = event;
+      this.splitParagraphIntoLines(paragraphIndex); */
+    });
+
     this.splitIntoParagraphs();
 
     this.splitAllParagraphsIntoLines();
