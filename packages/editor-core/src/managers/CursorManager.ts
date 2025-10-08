@@ -34,7 +34,7 @@ export class CursorManager extends EventEmitter<CursorManagerEvents> {
 
   private ctx: CanvasRenderingContext2D;
 
-  private get measureText (): (text: string) => TextMetrics {
+  private get measureText(): (text: string) => TextMetrics {
     return this.ctx.measureText.bind(this.ctx);
   }
 
@@ -453,23 +453,14 @@ export class CursorManager extends EventEmitter<CursorManagerEvents> {
       return newPos;
     }
 
-    // First step through the words to find the closest word boundary
-    let wordIndex = 0;
-    for (let i = 0; i < line.wordpixelOffsets.length; i++) {
-      if (line.wordpixelOffsets[i] > pixelOffsetInLine) {
-        break;
-      }
-      wordIndex = i;
-    }
-
     // Start from the beginning of the identified word
-    let accumulatedWidth = line.wordpixelOffsets[wordIndex];
-    let charIndex = line.wordCharOffsets[wordIndex];
+    let accumulatedWidth = 0;
+    let charIndex = 0;
     let decided = false;
     let finalPixelOffset = accumulatedWidth;
 
     // Add characters one by one until we reach or exceed the pixelOffset
-    for (let i = line.wordCharOffsets[wordIndex]; i < line.text.length; i++) {
+    for (let i = 0; i < line.text.length; i++) {
       const char = line.text[i];
       const charWidth = this.measureText(char).width;
       const nextAccumulatedWidth = accumulatedWidth + charWidth;

@@ -157,7 +157,7 @@ export class Editor extends EventEmitter<EditorEvents> {
         marginLeft: 20,
         marginRight: 300,
         lineHeight: 1.5,
-        align: 'justify',
+        align: 'left',
       },
       {
         marginLeft: 20,

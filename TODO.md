@@ -5,6 +5,7 @@
 - Review exporters
 - Optimize page calculations (check offsets instead of reparsing)
 - stop the reparsing of lines when it stabilizes
+- make canvas higher DPI
 
 ## 🚀 Major
 

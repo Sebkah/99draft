@@ -27,8 +27,7 @@ export type Line = {
   offset: number;
   length: number;
   pixelLength: number;
-  wordpixelOffsets: number[];
-  wordCharOffsets: number[];
+  freePixelSpace: number;
 };
 
 export class TextParser extends EventEmitter<TextParserEvents> {
@@ -323,67 +322,42 @@ export class TextParser extends EventEmitter<TextParserEvents> {
 
     let offsetInParagraph = 0;
     let currentLine = '';
-    let wordpixelOffsets: number[] = [];
-    let wordCharOffsets: number[] = [];
 
     tokens.forEach((token) => {
       //If the token is spaces only
       if (token.trim() === '') {
-        // If this is the start of a new line (empty currentLine), add initial 0 offset
-        if (currentLine === '') {
-          wordpixelOffsets.push(0);
-          wordCharOffsets.push(0);
-        }
-
-        let currentSpaceWidth = 0;
+        // Calculate the width of a single space character
         const spaceWidth = this.ctx.measureText(' ').width;
-        let spaceIndex = 0;
+        let currentLineWidth = this.ctx.measureText(currentLine).width;
+
+        // If this is the start of a new line (empty currentLine), add initial 0 offset
+        let currentSpaceWidth = 0;    
 
         // Process spaces one by one to allow breaking within space sequences
-        while (spaceIndex < token.length) {
-          const testChar = currentLine + token[spaceIndex];
-          const charMetrics = this.ctx.measureText(testChar);
+        for (let i = 0; i < token.length; i++) {
+          const testWidth = currentLineWidth + currentSpaceWidth + spaceWidth;
+          if (testWidth > maxWidth) {
+            // If adding this space exceeds the max width, finish the current line
+            lines.push({
+              text: currentLine,
+              offset: offsetInParagraph,
+              length: currentLine.length,
+              pixelLength: currentLineWidth,
+              freePixelSpace: maxWidth - currentLineWidth,
+            });
+            offsetInParagraph += currentLine.length;
 
-          // If adding this space exceeds the max width, we need to handle line breaking
-          if (charMetrics.width > maxWidth) {
-            // If current line has content, push it and start new line
-            if (currentLine.length > 0) {
-              lines.push({
-                text: currentLine,
-                offset: offsetInParagraph,
-                length: currentLine.length,
-                pixelLength: this.ctx.measureText(currentLine).width,
-                wordpixelOffsets: [...wordpixelOffsets],
-                wordCharOffsets: [...wordCharOffsets],
-              });
-              offsetInParagraph += currentLine.length;
-
-              // Start a new line and add the space that caused the break to the new line
-              wordpixelOffsets = [0]; // Always start with 0 for new lines
-              wordCharOffsets = [0]; // Always start with 0 for new lines
-              currentLine = token[spaceIndex]; // Add the space that caused the break
-              currentSpaceWidth = spaceWidth;
-              spaceIndex++; // Move to the next space
-            } else {
-              // Current line is empty, force add at least one space
-              currentLine = testChar;
-              currentSpaceWidth += spaceWidth;
-              spaceIndex++;
-            }
+            // Start a new line with the current space
+            currentLine = ' ';
+            currentSpaceWidth = spaceWidth;
+            currentLineWidth = spaceWidth; // Reset to just the space width
           } else {
             // Space fits on current line, add it
-            currentLine = testChar;
+            currentLine += ' ';
             currentSpaceWidth += spaceWidth;
-            spaceIndex++;
+            currentLineWidth += spaceWidth;
           }
-        }
-
-        // Only add to wordpixelOffsets if there are multiple spaces in the token
-        if (token.length > 1) {
-          wordpixelOffsets.push(this.ctx.measureText(currentLine).width - currentSpaceWidth);
-          wordCharOffsets.push(currentLine.length - token.length);
-        }
-
+        }   
         // Continue to next token
         return;
       }
@@ -401,18 +375,12 @@ export class TextParser extends EventEmitter<TextParserEvents> {
             offset: offsetInParagraph,
             length: currentLine.length,
             pixelLength: this.ctx.measureText(currentLine).width,
-            wordpixelOffsets: [...wordpixelOffsets],
-            wordCharOffsets: [...wordCharOffsets],
+            freePixelSpace: maxWidth - this.ctx.measureText(currentLine).width,
           });
           offsetInParagraph += currentLine.length;
 
-          // ...and start a new line with the current token
-          wordpixelOffsets = [0];
-          wordCharOffsets = [0];
           currentLine = token;
         } else {
-          wordpixelOffsets.push(this.ctx.measureText(currentLine).width);
-          wordCharOffsets.push(currentLine.length);
           currentLine = testLine;
         }
       }
@@ -424,8 +392,7 @@ export class TextParser extends EventEmitter<TextParserEvents> {
       offset: offsetInParagraph,
       length: currentLine.length,
       pixelLength: this.ctx.measureText(currentLine).width,
-      wordpixelOffsets: wordpixelOffsets,
-      wordCharOffsets: wordCharOffsets,
+      freePixelSpace: maxWidth - this.ctx.measureText(currentLine).width,
     });
 
     paragraph.setLines(lines); // Use the new setLines method which also marks as clean

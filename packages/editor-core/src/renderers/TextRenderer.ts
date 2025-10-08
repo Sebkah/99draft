@@ -9,8 +9,6 @@ export class TextRenderer {
 
   private debugInfoEnabled: boolean = true;
 
-  private justifyText: boolean = false;
-
   private hoveredParagraphIndex: number | null = null;
   private hoveredLine: { p: number; l: number } | null = null;
 
@@ -227,34 +225,6 @@ export class TextRenderer {
           ctx.fillText(`offset ${line.offset}`, 10, 0);
           ctx.fillText(`length ${line.length}`, 80, 0);
         }
-
-        // Render word offsets debug info
-        if (this.showDebugInfo && this.editor.debugConfig.showWordOffsets) {
-          line.wordpixelOffsets.forEach((wordOffset, windex) => {
-            // Render word pixel offsets as small vertical lines
-            ctx.fillStyle = 'red';
-            ctx.fillRect(wordOffset + marginLeft - 1, -lineHeight, 2, lineHeight);
-            ctx.fillStyle = 'green';
-            const topOrBottom =
-              windex % 2 === 0 ? lineHeight - lineHeight / 2 + 7 : lineHeight - lineHeight / 2;
-
-            // Display different info based on mode
-            let displayText = '';
-            switch (this.editor.debugConfig.wordDisplayMode) {
-              case 'index':
-                displayText = `${windex}`;
-                break;
-              case 'charOffset':
-                displayText = `${line.wordCharOffsets[windex] || 0}`;
-                break;
-              case 'pixelOffset':
-                displayText = `${wordOffset}px`;
-                break;
-            }
-
-            ctx.fillText(displayText, wordOffset + marginLeft - 2, topOrBottom);
-          });
-        }
       }
     }
 
@@ -269,14 +239,6 @@ export class TextRenderer {
   public render(pageIndex: number): void {
     const ctx = this.ctxs[pageIndex];
     const pages = this.textParser.getPages();
-    this.editor.logger.rendering(
-      'Rendering page',
-      pageIndex,
-      'of',
-      pages.length,
-      'total pages. Context available:',
-      !!ctx,
-    );
 
     if (!ctx) {
       this.editor.logger.warn(
@@ -322,12 +284,6 @@ export class TextRenderer {
 
       const wrappingWidth = this.editor.internalCanvas.width - marginLeft - marginRight;
 
-      // Safety check: Skip if paragraph is undefined (can happen during text deletion)
-      /*    if (!paragraph || !paragraph.lines) {
-        console.warn(`Paragraph at index ${i} is undefined or has no lines. Skipping rendering.`);
-        continue;
-      } */
-
       paragraph.lines.forEach((line, lindex) => {
         // Only render lines within the page's line range
         if (
@@ -346,8 +302,7 @@ export class TextRenderer {
 
         if (align === 'justify') {
           textToRender = line.text.trim();
-          const lineLengthRestWithoutSpaces =
-            wrappingWidth - ctx.measureText(textToRender).width;
+          const lineLengthRestWithoutSpaces = wrappingWidth - ctx.measureText(textToRender).width;
           const spaceCount = (textToRender.match(/ /g) || []).length;
           distributeSpace = spaceCount > 0 ? lineLengthRestWithoutSpaces / spaceCount : 0;
           shouldApplyWordSpacing = distributeSpace < 10000;
