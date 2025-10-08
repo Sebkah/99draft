@@ -157,7 +157,7 @@ export class Editor extends EventEmitter<EditorEvents> {
         marginLeft: 20,
         marginRight: 300,
         lineHeight: 1.5,
-        align: 'left',
+        align: 'justify',
       },
       {
         marginLeft: 20,
@@ -247,14 +247,17 @@ export class Editor extends EventEmitter<EditorEvents> {
 
   startSelection(mousePosition: MousePosition): void {
     this.selectionManager.startSelection(mousePosition);
+
     this.renderPages();
   }
   updateSelection(mousePosition: MousePosition): void {
     this.selectionManager.updateSelection(mousePosition);
+
     this.renderPages();
   }
   endSelection(mousePosition: MousePosition): void {
     this.selectionManager.endSelection(mousePosition);
+
     this.renderPages();
   }
 

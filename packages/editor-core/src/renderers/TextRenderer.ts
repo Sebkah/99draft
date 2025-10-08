@@ -1,8 +1,16 @@
 import { Editor } from '../core/Editor';
 import { TextParser } from '../core/TextParser';
+import { Line } from '../models/Line';
+import { Paragraph } from '../models/Paragraph';
 
 export class TextRenderer {
   private ctxs: (CanvasRenderingContext2D | null)[] = [];
+
+  private currentCtxIndex: number = 0;
+
+  private get currentCtx(): CanvasRenderingContext2D {
+    return this.ctxs[this.currentCtxIndex] as CanvasRenderingContext2D;
+  }
 
   private textParser: TextParser;
   private editor: Editor;
@@ -40,8 +48,8 @@ export class TextRenderer {
   }
 
   // Render a single line of text on the canvas
-  private renderLine(ctx: CanvasRenderingContext2D, text: string, x: number, y: number): void {
-    ctx.fillText(text, x, y);
+  private renderLine(text: string, x: number): void {
+    (this.ctxs[this.currentCtxIndex] as CanvasRenderingContext2D).fillText(text, x, 0);
   }
 
   // Set the base text style
@@ -52,13 +60,13 @@ export class TextRenderer {
 
   // Render cursor for the current line if conditions are met
   private renderCursor(
-    ctx: CanvasRenderingContext2D,
     pageIndex: number,
     absoluteParagraphIndex: number,
     lindex: number,
     leftMargin: number,
-    lineHeight: number,
+    cursorHeight: number = 20,
   ): void {
+    const ctx = this.currentCtx;
     const structurePosition = this.editor.cursorManager.structurePosition;
 
     // Render cursor if it's in the current line and on the current page
@@ -69,28 +77,34 @@ export class TextRenderer {
       !this.editor.selectionManager.hasSelection()
     ) {
       if (this.editor.debugConfig.showCursor) {
-        ctx.fillRect(structurePosition.pixelOffsetInLine + leftMargin, 0, 2, lineHeight);
+        ctx.fillRect(
+          structurePosition.pixelOffsetInLine + leftMargin,
+          -cursorHeight,
+          2,
+          cursorHeight,
+        );
       }
     }
   }
 
   // Render selection highlight for a single line if present
   private renderLineSelection(
-    ctx: CanvasRenderingContext2D,
-    paragraph: any,
-    line: any,
+    paragraph: Paragraph,
+    line: Line,
     adjustedLeftMargin: number,
     lineHeight: number,
+    justified: boolean = false,
   ): void {
     if (!this.editor.selectionManager.hasSelection()) {
       return;
     }
+    const ctx = this.currentCtx;
 
     const sel = this.editor.selectionManager.getSelection()!;
     const start = sel.start;
     const end = sel.end;
 
-    const lineStart = paragraph.offset + line.offset;
+    const lineStart = paragraph.offset + line.offsetInParagraph;
     const lineEnd = lineStart + line.length;
 
     const overlStart = Math.max(start, lineStart);
@@ -100,17 +114,26 @@ export class TextRenderer {
       const startChar = overlStart - lineStart;
       const endChar = overlEnd - lineStart;
 
+      ctx.save();
+
+      let { text } = line;
+
+      if (justified) {
+        const { distributedSpace, textTrimmed } = line.getjustifyData(ctx);
+        ctx.wordSpacing = distributedSpace + 'px';
+        text = textTrimmed;
+      }
+
       // Measure widths using the current context (which may have word spacing applied)
-      const startWidth = ctx.measureText(line.text.substring(0, startChar)).width;
-      const endWidth = ctx.measureText(line.text.substring(0, endChar)).width;
+      const startWidth = ctx.measureText(text.substring(0, startChar)).width;
+      const endWidth = ctx.measureText(text.substring(0, endChar)).width;
 
       const rectX = adjustedLeftMargin + startWidth;
       const rectW = Math.max(1, endWidth - startWidth);
 
-      ctx.save();
       ctx.fillStyle = 'rgba(56, 189, 248, 0.25)';
       // Draw selection rectangle at current transform position
-      ctx.fillRect(rectX, 0, rectW, lineHeight);
+      ctx.fillRect(rectX, -lineHeight, rectW, lineHeight);
       ctx.restore();
     }
   }
@@ -237,7 +260,8 @@ export class TextRenderer {
   }
 
   public render(pageIndex: number): void {
-    const ctx = this.ctxs[pageIndex];
+    this.currentCtxIndex = pageIndex;
+    const ctx = this.currentCtx;
     const pages = this.textParser.getPages();
 
     if (!ctx) {
@@ -280,11 +304,10 @@ export class TextRenderer {
       const paragraph = allParagraphs[i];
       const styles = this.editor.paragraphStylesManager.getParagraphStyles(i);
 
-      const { align, marginLeft, marginRight } = styles;
-
-      const wrappingWidth = this.editor.internalCanvas.width - marginLeft - marginRight;
+      const { align, marginLeft } = styles;
 
       paragraph.lines.forEach((line, lindex) => {
+        ctx.translate(0, lineHeight);
         // Only render lines within the page's line range
         if (
           (i === page.startParagraphIndex && lindex < startLineIndex) ||
@@ -293,52 +316,54 @@ export class TextRenderer {
           return;
         }
 
-        // Calculate alignment adjustments once
-        const lineLengthRest = wrappingWidth - line.pixelLength;
-        let adjustedLeftMargin = marginLeft;
-        let textToRender = line.text;
-        let shouldApplyWordSpacing = false;
-        let distributeSpace = 0;
+        const { freePixelSpace, text } = line;
 
-        if (align === 'justify') {
-          textToRender = line.text.trim();
-          const lineLengthRestWithoutSpaces = wrappingWidth - ctx.measureText(textToRender).width;
-          const spaceCount = (textToRender.match(/ /g) || []).length;
-          distributeSpace = spaceCount > 0 ? lineLengthRestWithoutSpaces / spaceCount : 0;
-          shouldApplyWordSpacing = distributeSpace < 10000;
-        } else if (align === 'center') {
-          adjustedLeftMargin = marginLeft + lineLengthRest / 2;
-        } else if (align === 'right') {
-          adjustedLeftMargin = marginLeft + lineLengthRest;
-        }
-
-        // Apply word spacing if needed for justify alignment
-        if (shouldApplyWordSpacing) {
-          ctx.wordSpacing = distributeSpace + 'px';
-        }
-
-        // Render selection highlight for this line (uses adjusted margin)
-        this.renderLineSelection(ctx, paragraph, line, adjustedLeftMargin, lineHeight);
-
-        // Render cursor if it's in the current line and on the current page
-        this.renderCursor(ctx, pageIndex, i, lindex, marginLeft, lineHeight);
+        let textToRender = text;
+        let marginLeftAdjusted = marginLeft;
 
         // Render the text
-        ctx.translate(0, lineHeight);
-        this.renderLine(ctx, textToRender, adjustedLeftMargin, 0);
-        ctx.wordSpacing = '0px'; // Reset word spacing
-
-        if (align === 'justify') {
-          return;
+        switch (align) {
+          case 'center':
+            marginLeftAdjusted = marginLeft + freePixelSpace / 2;
+            break;
+          case 'right':
+            marginLeftAdjusted = marginLeft + freePixelSpace;
+            break;
+          case 'justify':
+            const isLastLine = lindex === paragraph.lines.length - 1;
+            if (isLastLine) {
+              // Last line of paragraph is not justified
+              break;
+            }
+            const { distributedSpace, textTrimmed } = line.getjustifyData(ctx);
+            ctx.wordSpacing = `${distributedSpace}px`;
+            textToRender = textTrimmed;
+            break;
+          default:
+            break;
         }
 
-        // Default case (left alignment) is already handled above
+        this.renderLine(textToRender, marginLeftAdjusted);
+
+        // Render selection highlight for this line (uses adjusted margin)
+        this.renderLineSelection(
+          paragraph,
+          line,
+          marginLeftAdjusted,
+          lineHeight,
+          align === 'justify',
+        );
+
+        // Render cursor if it's in the current line and on the current page
+        this.renderCursor(pageIndex, i, lindex, marginLeft, lineHeight);
+
+        ctx.wordSpacing = '0px'; // Reset word spacing
       });
     }
 
     ctx.restore();
 
-    // Always render debug overlay pass (will only show text if enabled)
-    this.renderDebugInfo(ctx, lineHeight, pageIndex);
+    /*     // Always render debug overlay pass (will only show text if enabled)
+    this.renderDebugInfo(ctx, lineHeight, pageIndex); */
   }
 }

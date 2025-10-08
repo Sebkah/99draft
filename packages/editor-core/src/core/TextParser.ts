@@ -2,33 +2,9 @@ import { Editor } from './Editor';
 import { PieceTable } from '../pieceTable/PieceTable';
 import { Paragraph } from '../models/Paragraph';
 import { Page } from '../models/Page';
+import { Line } from '../models/Line';
 import { EventEmitter } from '../utils/EventEmitter';
 import type { TextParserEvents, PageCountChangeEvent } from '../types/TextParserEvents';
-
-/**
- * Represents a line of text with associated metadata.
- *
- * @property te    lines.push({
-      text: currentLine || '',
-      offset: offsetInParagraph,
-      length: currentLine.length,
-      pixelLength: this.ctx.measureText(currentLine).width,
-      wordpixelOffsets: [...wordpixelOffsets],
-      wordCharOffsets: [...wordCharOffsets],
-    });e content of the line.
- * @property offset - The starting character offset of the line relative to the paragraph.
- * @property length - The number of characters in the line.
- * @property pixelLength - The rendered pixel width of the line.
- * @property wordpixelOffsets - An array of pixel offsets for each word in the line.
- * @property wordCharOffsets - An array of character offsets for each word in the line.
- */
-export type Line = {
-  text: string;
-  offsetInParagraph: number;
-  length: number;
-  pixelLength: number;
-  freePixelSpace: number;
-};
 
 export class TextParser extends EventEmitter<TextParserEvents> {
   private pieceTable: PieceTable;
@@ -341,13 +317,16 @@ export class TextParser extends EventEmitter<TextParserEvents> {
           const testWidth = currentLineWidth + currentSpaceWidth + spaceWidth;
           if (testWidth > maxWidth) {
             // If adding this space exceeds the max width, finish the current line
-            lines.push({
-              text: currentLine,
-              offsetInParagraph: offsetInParagraph,
-              length: currentLine.length,
-              pixelLength: currentLineWidth,
-              freePixelSpace: maxWidth - currentLineWidth,
-            });
+            lines.push(
+              new Line(
+                currentLine,
+                offsetInParagraph,
+                currentLine.length,
+                currentLineWidth,
+                maxWidth - currentLineWidth,
+                wrappingWidth,
+              ),
+            );
 
             offsetInParagraph += currentLine.length;
 
@@ -374,13 +353,16 @@ export class TextParser extends EventEmitter<TextParserEvents> {
 
         if (currentLineWidth + tokenWidth > maxWidth) {
           // Line is too long, push the current line...
-          lines.push({
-            text: currentLine,
-            offsetInParagraph: offsetInParagraph,
-            length: currentLine.length,
-            pixelLength: currentLineWidth,
-            freePixelSpace: maxWidth - currentLineWidth,
-          });
+          lines.push(
+            new Line(
+              currentLine,
+              offsetInParagraph,
+              currentLine.length,
+              currentLineWidth,
+              maxWidth - currentLineWidth,
+              wrappingWidth,
+            ),
+          );
           offsetInParagraph += currentLine.length;
 
           currentLine = token;
@@ -395,13 +377,16 @@ export class TextParser extends EventEmitter<TextParserEvents> {
     // Push any remaining text as the last line
     // Always ensure at least one line exists (even for empty paragraphs with just a newline)
     if (currentLine.length > 0 || lines.length === 0) {
-      lines.push({
-        text: currentLine,
-        offsetInParagraph: offsetInParagraph,
-        length: currentLine.length,
-        pixelLength: currentLineWidth,
-        freePixelSpace: maxWidth - currentLineWidth,
-      });
+      lines.push(
+        new Line(
+          currentLine,
+          offsetInParagraph,
+          currentLine.length,
+          currentLineWidth,
+          maxWidth - currentLineWidth,
+          wrappingWidth,
+        ),
+      );
     }
 
     paragraph.setLines(lines);

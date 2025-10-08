@@ -1,4 +1,5 @@
-import { Line } from '../core/TextParser';
+import { Line } from "./Line";
+
 
 /**
  * Represents a paragraph of text with associated metadata and methods for manipulation.

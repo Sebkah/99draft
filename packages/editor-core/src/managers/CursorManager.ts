@@ -3,6 +3,7 @@ import { TextParser } from '../core/TextParser';
 import { EventEmitter } from '../utils/EventEmitter';
 import type { CursorManagerEvents, CursorChangeEvent } from '../types/CursorEvents';
 import type { SelectionManager } from './SelectionManager';
+import { ParagraphStyle } from '../styles/ParagraphStylesManager';
 
 export type StructurePosition = {
   pageIndex: number;

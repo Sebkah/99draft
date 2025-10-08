@@ -36,3 +36,4 @@ export type { EditorLogger } from './managers/EditorLogger';
 // Page management
 export { Page } from './models/Page';
 export { Paragraph } from './models/Paragraph';
+export { Line } from './models/Line';
