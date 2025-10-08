@@ -1,14 +1,8 @@
 # 99draft
 
-An experimenter into making a text editor. 
-
-## Overview
-
-The architecture is split into three distinct layers:
+An experiment into making a text editor. 
 
 ### 📦 Project Structure
-
-This is a **monorepo** containing three main packages:
 
 #### **`@99draft/editor-core`** - Core Editor Engine
 
@@ -43,10 +37,3 @@ A cross-platform desktop application that consumes the React library
 ## 📄 License
 
 This project is licensed under the [Creative Commons Attribution-Non Commercial-ShareAlike 4.0 International License (CC BY-NC-SA 4.0)](https://creativecommons.org/licenses/by-nc-sa/4.0/).
-
-**What this means:**
-
-- ✅ You can use, modify, and share this project
-- ✅ You must give appropriate credit
-- ✅ Any derivative works must use the same license
-- ❌ You cannot use this project for commercial purposes
