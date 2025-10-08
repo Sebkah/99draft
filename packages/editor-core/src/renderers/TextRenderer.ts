@@ -81,7 +81,7 @@ export class TextRenderer {
     ctx: CanvasRenderingContext2D,
     paragraph: any,
     line: any,
-    leftMargin: number,
+    adjustedLeftMargin: number,
     lineHeight: number,
   ): void {
     if (!this.editor.selectionManager.hasSelection()) {
@@ -102,10 +102,11 @@ export class TextRenderer {
       const startChar = overlStart - lineStart;
       const endChar = overlEnd - lineStart;
 
-      // measure widths
+      // Measure widths using the current context (which may have word spacing applied)
       const startWidth = ctx.measureText(line.text.substring(0, startChar)).width;
       const endWidth = ctx.measureText(line.text.substring(0, endChar)).width;
-      const rectX = leftMargin + startWidth;
+
+      const rectX = adjustedLeftMargin + startWidth;
       const rectW = Math.max(1, endWidth - startWidth);
 
       ctx.save();
@@ -336,52 +337,47 @@ export class TextRenderer {
           return;
         }
 
-        // Render selection highlight for this line (uses correct marginLeft)
-        this.renderLineSelection(ctx, paragraph, line, marginLeft, lineHeight);
+        // Calculate alignment adjustments once
+        const lineLengthRest = wrappingWidth - line.pixelLength;
+        let adjustedLeftMargin = marginLeft;
+        let textToRender = line.text;
+        let shouldApplyWordSpacing = false;
+        let distributeSpace = 0;
+
+        if (align === 'justify') {
+          textToRender = line.text.trim();
+          const lineLengthRestWithoutSpaces =
+            wrappingWidth - ctx.measureText(textToRender).width;
+          const spaceCount = (textToRender.match(/ /g) || []).length;
+          distributeSpace = spaceCount > 0 ? lineLengthRestWithoutSpaces / spaceCount : 0;
+          shouldApplyWordSpacing = distributeSpace < 10000;
+        } else if (align === 'center') {
+          adjustedLeftMargin = marginLeft + lineLengthRest / 2;
+        } else if (align === 'right') {
+          adjustedLeftMargin = marginLeft + lineLengthRest;
+        }
+
+        // Apply word spacing if needed for justify alignment
+        if (shouldApplyWordSpacing) {
+          ctx.wordSpacing = distributeSpace + 'px';
+        }
+
+        // Render selection highlight for this line (uses adjusted margin)
+        this.renderLineSelection(ctx, paragraph, line, adjustedLeftMargin, lineHeight);
 
         // Render cursor if it's in the current line and on the current page
         this.renderCursor(ctx, pageIndex, i, lindex, marginLeft, lineHeight);
 
-        const lineLengthRest = wrappingWidth - line.pixelLength;
+        // Render the text
+        ctx.translate(0, lineHeight);
+        this.renderLine(ctx, textToRender, adjustedLeftMargin, 0);
+        ctx.wordSpacing = '0px'; // Reset word spacing
 
         if (align === 'justify') {
-          const textWithoutLeadingAndTrailingSpaces = line.text.trim();
-          const lineLengthRestWithoutSpaces =
-            wrappingWidth - ctx.measureText(textWithoutLeadingAndTrailingSpaces).width;
-
-          const spaceCount = (textWithoutLeadingAndTrailingSpaces.match(/ /g) || []).length;
-          const distributeSpace = spaceCount > 0 ? lineLengthRestWithoutSpaces / spaceCount : 0;
-
-          // Prevent excessive word spacing that would look unnatural (max ~10000px seems reasonable)
-          if (distributeSpace < 10000) {
-            ctx.wordSpacing = distributeSpace + 'px';
-          }
-          ctx.translate(0, lineHeight);
-          this.renderLine(ctx, textWithoutLeadingAndTrailingSpaces, marginLeft, 0);
-          ctx.wordSpacing = '0px'; // Reset word spacing after justify
-
           return;
         }
 
-        if (align === 'center') {
-          const offset = lineLengthRest / 2;
-          ctx.translate(0, lineHeight);
-          this.renderLine(ctx, line.text, marginLeft + offset, 0);
-          ctx.wordSpacing = '0px'; // Ensure word spacing is reset
-
-          return;
-        }
-
-        if (align === 'right') {
-          ctx.translate(0, lineHeight);
-          this.renderLine(ctx, line.text, marginLeft + lineLengthRest, 0);
-          ctx.wordSpacing = '0px'; // Ensure word spacing is reset
-          return;
-        }
-
-        ctx.translate(0, lineHeight);
-        this.renderLine(ctx, line.text, marginLeft, 0);
-        ctx.wordSpacing = '0px';
+        // Default case (left alignment) is already handled above
       });
     }
 

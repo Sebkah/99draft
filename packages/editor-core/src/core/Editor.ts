@@ -296,10 +296,6 @@ export class Editor extends EventEmitter<EditorEvents> {
       align,
     });
 
-    this.textParser.splitParagraphIntoLines(paragraphIndex);
-
-    this.textParser.splitParagraphsIntoPages();
-
     this.cursorManager.mapLinearToStructure();
     this.renderPages();
   }
@@ -481,7 +477,6 @@ export class Editor extends EventEmitter<EditorEvents> {
     }
 
     // Case 2.1: Only one character
-    // If deleting only one character
     if (length === 1) {
       // Check if we are deleting a newline character
       const charBefore = this.pieceTable.getRangeText(currentPosition - 1, 1);

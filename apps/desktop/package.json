@@ -29,6 +29,7 @@
     "motion": "^12.23.12"
   },
   "devDependencies": {
+    "@tailwindcss/vite": "^4.1.14",
     "@electron-toolkit/eslint-config-prettier": "^3.0.0",
     "@electron-toolkit/eslint-config-ts": "^3.0.0",
     "@electron-toolkit/tsconfig": "^1.0.1",
