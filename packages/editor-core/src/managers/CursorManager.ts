@@ -200,8 +200,8 @@ export class CursorManager extends EventEmitter<CursorManagerEvents> {
       // Allow cursor to be positioned at the end of any line, including trailing whitespace
       // Use <= instead of < to include the position exactly at the end of the line
       if (
-        cursorOffsetInParagraph >= line.offset &&
-        cursorOffsetInParagraph < line.offset + line.length + endOffsetDelta
+        cursorOffsetInParagraph >= line.offsetInParagraph &&
+        cursorOffsetInParagraph < line.offsetInParagraph + line.length + endOffsetDelta
       ) {
         lineIndex = j;
         break;
@@ -213,7 +213,7 @@ export class CursorManager extends EventEmitter<CursorManagerEvents> {
     if (lineIndex !== -1) {
       const cursorOffsetInParagraph = cursorPosition - paragraph.offset;
       const line = paragraph.lines[lineIndex];
-      const positionInLine = cursorOffsetInParagraph - line.offset;
+      const positionInLine = cursorOffsetInParagraph - line.offsetInParagraph;
 
       // Ensure positionInLine doesn't exceed the line length (safety check)
       const clampedPositionInLine = Math.min(positionInLine, line.text.length);
@@ -348,7 +348,7 @@ export class CursorManager extends EventEmitter<CursorManagerEvents> {
 
     const targetLine = targetParagraph.lines[lineIndex];
     if (characterIndex < 0 || characterIndex > targetLine.text.length) return this.linearPosition; // Invalid character index
-    return targetParagraph.offset + targetLine.offset + characterIndex;
+    return targetParagraph.offset + targetLine.offsetInParagraph + characterIndex;
   }
 
   public getLineAdjacentLinearPosition(
@@ -410,7 +410,7 @@ export class CursorManager extends EventEmitter<CursorManagerEvents> {
     // XXX: check this code out
     if (!line.text || line.text.length === 0) {
       console.log('Empty line, moving to start of line');
-      const newPos = targetParagraph.offset + line.offset;
+      const newPos = targetParagraph.offset + line.offsetInParagraph;
       if (moveCursor) {
         // Find the correct page for this empty line
         const pages = this.textParser.getPages();
@@ -491,7 +491,8 @@ export class CursorManager extends EventEmitter<CursorManagerEvents> {
       finalPixelOffset = accumulatedWidth;
     }
 
-    const newPos = targetParagraph.offset + targetParagraph.lines[targetLine].offset + charIndex;
+    const newPos =
+      targetParagraph.offset + targetParagraph.lines[targetLine].offsetInParagraph + charIndex;
     if (moveCursor) {
       // TODO: check this part of the code, it seems complex for something that should be simple
       // Calculate the page index for the new position

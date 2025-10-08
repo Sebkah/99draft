@@ -24,7 +24,7 @@ import type { TextParserEvents, PageCountChangeEvent } from '../types/TextParser
  */
 export type Line = {
   text: string;
-  offset: number;
+  offsetInParagraph: number;
   length: number;
   pixelLength: number;
   freePixelSpace: number;
@@ -316,86 +316,95 @@ export class TextParser extends EventEmitter<TextParserEvents> {
     const wrappingWidth = this.editor.internalCanvas.width - marginLeft - marginRight;
 
     const maxWidth = wrappingWidth;
-    // Split while preserving spaces
+
+    // Calculate the width of a single space character
+    const spaceWidth = this.ctx.measureText(' ').width;
+
+    // Split while preserving spaces (using regex to keep spaces in the array)
     const tokens = paragraph.text.split(/(\s+)/);
+
     const lines: Line[] = [];
 
     let offsetInParagraph = 0;
     let currentLine = '';
+    let currentLineWidth = 0;
 
     tokens.forEach((token) => {
-      //If the token is spaces only
+      // 1. Token is spaces only
       if (token.trim() === '') {
-        // Calculate the width of a single space character
-        const spaceWidth = this.ctx.measureText(' ').width;
-        let currentLineWidth = this.ctx.measureText(currentLine).width;
-
-        // If this is the start of a new line (empty currentLine), add initial 0 offset
-        let currentSpaceWidth = 0;    
+        // Width of spaces added so far in this sequence
+        let currentSpaceWidth = 0;
 
         // Process spaces one by one to allow breaking within space sequences
         for (let i = 0; i < token.length; i++) {
+          // Test if adding one more space exceeds the max width
           const testWidth = currentLineWidth + currentSpaceWidth + spaceWidth;
           if (testWidth > maxWidth) {
             // If adding this space exceeds the max width, finish the current line
             lines.push({
               text: currentLine,
-              offset: offsetInParagraph,
+              offsetInParagraph: offsetInParagraph,
               length: currentLine.length,
               pixelLength: currentLineWidth,
               freePixelSpace: maxWidth - currentLineWidth,
             });
+
             offsetInParagraph += currentLine.length;
 
             // Start a new line with the current space
             currentLine = ' ';
             currentSpaceWidth = spaceWidth;
-            currentLineWidth = spaceWidth; // Reset to just the space width
+            currentLineWidth = spaceWidth;
           } else {
             // Space fits on current line, add it
             currentLine += ' ';
             currentSpaceWidth += spaceWidth;
             currentLineWidth += spaceWidth;
           }
-        }   
+        }
         // Continue to next token
         return;
       }
 
+      // 2. Token is a regular word/token (not just spaces)
       if (token.trim()) {
-        // Handle regular words/tokens
         // Recalculate testLine and metrics after spaces have been processed
+        const tokenWidth = this.ctx.measureText(token).width;
         const testLine = currentLine + token;
-        const metrics = this.ctx.measureText(testLine);
 
-        if (metrics.width > maxWidth && currentLine.length > 0) {
+        if (currentLineWidth + tokenWidth > maxWidth) {
           // Line is too long, push the current line...
           lines.push({
             text: currentLine,
-            offset: offsetInParagraph,
+            offsetInParagraph: offsetInParagraph,
             length: currentLine.length,
-            pixelLength: this.ctx.measureText(currentLine).width,
-            freePixelSpace: maxWidth - this.ctx.measureText(currentLine).width,
+            pixelLength: currentLineWidth,
+            freePixelSpace: maxWidth - currentLineWidth,
           });
           offsetInParagraph += currentLine.length;
 
           currentLine = token;
+          currentLineWidth = tokenWidth;
         } else {
           currentLine = testLine;
+          currentLineWidth += tokenWidth;
         }
       }
     });
 
     // Push any remaining text as the last line
-    lines.push({
-      text: currentLine || '',
-      offset: offsetInParagraph,
-      length: currentLine.length,
-      pixelLength: this.ctx.measureText(currentLine).width,
-      freePixelSpace: maxWidth - this.ctx.measureText(currentLine).width,
-    });
+    // Always ensure at least one line exists (even for empty paragraphs with just a newline)
+    if (currentLine.length > 0 || lines.length === 0) {
+      lines.push({
+        text: currentLine,
+        offsetInParagraph: offsetInParagraph,
+        length: currentLine.length,
+        pixelLength: currentLineWidth,
+        freePixelSpace: maxWidth - currentLineWidth,
+      });
+    }
 
-    paragraph.setLines(lines); // Use the new setLines method which also marks as clean
+    paragraph.setLines(lines);
   }
 
   /**

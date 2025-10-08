@@ -369,7 +369,7 @@ const DebugPanel: React.FC<Props> = ({ editor }) => {
                               lindex,
                               x,
                               y,
-                              offset: l.offset,
+                              offset: l.offsetInParagraph,
                               length: l.length,
                               pixelLength: Math.round(l.pixelLength),
                               words: l.wordpixelOffsets?.length ?? 0,

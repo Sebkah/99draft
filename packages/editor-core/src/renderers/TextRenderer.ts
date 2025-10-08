@@ -222,7 +222,7 @@ export class TextRenderer {
         // Render line debug info
         if (this.showDebugInfo && this.editor.debugConfig.showLineInfo) {
           ctx.fillStyle = 'blue';
-          ctx.fillText(`offset ${line.offset}`, 10, 0);
+          ctx.fillText(`offset ${line.offsetInParagraph}`, 10, 0);
           ctx.fillText(`length ${line.length}`, 80, 0);
         }
       }
