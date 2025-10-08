@@ -24,6 +24,7 @@
   "dependencies": {
     "@99draft/editor-core": "workspace:*",
     "@99draft/editor-react": "workspace:*",
+    "@99draft/tree-visualizer": "workspace:*",
     "@electron-toolkit/preload": "^3.0.1",
     "@electron-toolkit/utils": "^4.0.0",
     "motion": "^12.23.12"

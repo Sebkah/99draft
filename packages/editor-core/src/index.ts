@@ -37,3 +37,7 @@ export type { EditorLogger } from './managers/EditorLogger';
 export { Page } from './models/Page';
 export { Paragraph } from './models/Paragraph';
 export { Line } from './models/Line';
+
+// Data structures
+export { RedBlackIntervalTree, RedBlackNode, NodeColor } from './structures/RedBlackIntervalTree';
+export type { Interval } from './structures/RedBlackIntervalTree';

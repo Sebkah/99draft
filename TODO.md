@@ -9,6 +9,7 @@
 
 ## 🚀 Major
 
+- correctly map cursor when align != left
 - Implement styleManager
 - Add partial rendering of pages
 

@@ -42,6 +42,37 @@ function createWindow(): BrowserWindow {
 }
 
 /**
+ * Creates a new window for the Tree Visualizer
+ */
+function createTreeVisualizerWindow(): BrowserWindow {
+  const visualizerWindow = new BrowserWindow({
+    width: 1600,
+    height: 900,
+    show: false,
+    autoHideMenuBar: false,
+    title: 'Red-Black Tree Visualizer',
+    ...(process.platform === 'linux' ? { icon } : {}),
+    webPreferences: {
+      preload: join(__dirname, '../preload/index.js'),
+      sandbox: false,
+    },
+  });
+
+  visualizerWindow.on('ready-to-show', () => {
+    visualizerWindow.show();
+  });
+
+  // Load the visualizer page
+  if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
+    visualizerWindow.loadURL(`${process.env['ELECTRON_RENDERER_URL']}/visualizer.html`);
+  } else {
+    visualizerWindow.loadFile(join(__dirname, '../renderer/visualizer.html'));
+  }
+
+  return visualizerWindow;
+}
+
+/**
  * Creates the application menu with PDF export functionality
  */
 function createApplicationMenu(mainWindow: BrowserWindow): void {
@@ -99,6 +130,18 @@ function createApplicationMenu(mainWindow: BrowserWindow): void {
         { role: 'zoomout' },
         { type: 'separator' },
         { role: 'togglefullscreen' },
+      ],
+    },
+    {
+      label: 'Debug',
+      submenu: [
+        {
+          label: 'Open Tree Visualizer',
+          accelerator: 'CmdOrCtrl+Shift+T',
+          click: () => {
+            createTreeVisualizerWindow();
+          },
+        },
       ],
     },
   ];

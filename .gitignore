@@ -6,7 +6,4 @@ out
 .turbo
 *.log*
 *.tsbuildinfo
-packages/editor-core/tsconfig.tsbuildinfo
 .turbo/preferences/tui.json
-.turbo
-.tsbuildinfo
