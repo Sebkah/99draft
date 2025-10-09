@@ -10,7 +10,8 @@
 ## 🚀 Major
 
 - correctly map cursor when align != left
-- Implement styleManager
+- Implement styleManager - WIIIP
+  - correclty measure text (central measuring tool in Text Parser) with styles
 - Add partial rendering of pages
 
 ## 🐛 Bugs

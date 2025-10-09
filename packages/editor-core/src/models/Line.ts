@@ -1,8 +1,17 @@
+import { Run } from '../structures/Run';
+
 type JustifyData = {
   textTrimmed: string;
   pixelLengthTrimmed: number;
   spaceCount: number;
   distributedSpace: number;
+};
+
+type Styles = {
+  bold?: boolean;
+  italic?: boolean;
+  underline?: boolean;
+  strikethrough?: boolean;
 };
 
 /**
@@ -12,7 +21,7 @@ type JustifyData = {
  * the text content and its visual/layout properties like pixel width and character offsets.
  */
 export class Line {
-  private wrappingWidth: number;
+  public readonly wrappingWidth: number;
 
   /** The content of the line (may include trailing spaces)   */
   public readonly text: string;
@@ -27,6 +36,9 @@ export class Line {
 
   /** The available pixel space remaining in the line (for justification, etc.)  */
   public readonly freePixelSpace: number;
+
+  /** Cached style runs for this line, with coordinates relative to the line start (0-based) */
+  public readonly styleRuns: Run<Styles>[];
 
   private _justifyData?: JustifyData;
 
@@ -59,7 +71,8 @@ export class Line {
    * @param length - The number of characters in the line
    * @param pixelLength - The rendered pixel width of the line
    * @param freePixelSpace - The available pixel space remaining in the line
-
+   * @param wrappingWidth - The wrapping width for the line
+   * @param styleRuns - Cached style runs with coordinates relative to the line start
    */
   constructor(
     text: string,
@@ -68,6 +81,7 @@ export class Line {
     pixelLength: number,
     freePixelSpace: number,
     wrappingWidth: number,
+    styleRuns: Run<Styles>[] = [],
   ) {
     this.text = text;
     this.offsetInParagraph = offsetInParagraph;
@@ -75,6 +89,7 @@ export class Line {
     this.pixelLength = pixelLength;
     this.freePixelSpace = freePixelSpace;
     this.wrappingWidth = wrappingWidth;
+    this.styleRuns = styleRuns;
   }
 
   /**
