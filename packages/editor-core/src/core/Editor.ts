@@ -144,7 +144,7 @@ export class Editor extends EventEmitter<EditorEvents> {
     this.pieceTable = new PieceTable(initialText, this.logger);
 
     // Initialize text renderer and input manager
-    this.stylesManager = new StylesManager();
+    this.stylesManager = new StylesManager(this);
     this.paragraphStylesManager = new ParagraphStylesManager(this, [
       {
         marginLeft: 45,
@@ -477,6 +477,13 @@ export class Editor extends EventEmitter<EditorEvents> {
     this.pieceTable.insert(text, currentPosition);
     this.textParser.reparseParagraph(currentPosition, text.length);
     this.cursorManager.moveRight(text.length);
+
+    // Emit afterInsertion event
+    this.emit('afterInsertion', {
+      text,
+      position: currentPosition,
+      length: text.length,
+    });
   }
 
   /**
@@ -494,6 +501,13 @@ export class Editor extends EventEmitter<EditorEvents> {
     this.textParser.splitParagraphDirectly(currentPosition);
 
     this.cursorManager.moveRight(1);
+
+    // Emit afterInsertion event for line break
+    this.emit('afterInsertion', {
+      text: '\n',
+      position: currentPosition,
+      length: 1,
+    });
   }
 
   /**
@@ -595,6 +609,12 @@ export class Editor extends EventEmitter<EditorEvents> {
       this.textParser.deleteTextRangeDirectly(currentPosition - length, length);
     }
 
+    // Emit afterDeletion event
+    this.emit('afterDeletion', {
+      position: currentPosition - length,
+      length,
+    });
+
     // Re-split paragraphs into pages
     this.textParser.splitParagraphsIntoPages();
 
@@ -623,6 +643,12 @@ export class Editor extends EventEmitter<EditorEvents> {
     this.textParser.deleteTextRangeDirectly(start, selectionLength);
     this.cursorManager.setCursorPosition(start);
     this.selectionManager.clearSelection();
+
+    // Emit afterDeletion event
+    this.emit('afterDeletion', {
+      position: start,
+      length: selectionLength,
+    });
 
     return true;
   }

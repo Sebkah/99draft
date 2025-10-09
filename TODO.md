@@ -20,6 +20,8 @@
 - Handle end of document globally
   - Check bounds handling in piece table
 
+- bugs on run deletion insertion (see order of event notamment)
+
 ## ♻️ Refactors
 
 - Separate Editor concerns: interaction vs. pure text handling logic

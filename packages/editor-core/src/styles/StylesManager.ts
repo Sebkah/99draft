@@ -1,3 +1,4 @@
+import { Editor } from '../core/Editor';
 import { BooleanRunManager } from '../runManagers/BooleanRunManager';
 import { Run } from '../structures/Run';
 
@@ -10,10 +11,10 @@ type Styles = {
 
 export class StylesManager {
   private runManagers: Map<Style, BooleanRunManager>;
-  constructor() {
+  constructor(editor: Editor) {
     this.runManagers = new Map();
     for (const style of booleanStyles) {
-      this.runManagers.set(style, new BooleanRunManager());
+      this.runManagers.set(style, new BooleanRunManager(editor));
     }
   }
 

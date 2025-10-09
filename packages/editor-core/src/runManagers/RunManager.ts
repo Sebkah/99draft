@@ -1,8 +1,18 @@
 import { Run } from '../structures/Run';
 import { RedBlackIntervalTree } from '../structures/RedBlackIntervalTree';
+import { Editor } from '../core/Editor';
 
 export abstract class RunManager<T extends {} | null> {
   protected tree = new RedBlackIntervalTree<T>();
+
+  constructor(private editor: Editor) {
+    editor.on('afterInsertion', ({ position, length }) => {
+      this.onTextInsertion(position, length);
+    });
+    editor.on('afterDeletion', ({ position, length }) => {
+      this.onTextDeletion(position, length);
+    });
+  }
 
   onTextInsertion(position: number, length: number): void {
     const rootNode = this.tree.getRoot();
