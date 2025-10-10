@@ -5,8 +5,9 @@ import { Editor } from '../core/Editor';
 export abstract class RunManager<T extends {} | null> {
   protected tree = new RedBlackIntervalTree<T>();
 
-  constructor(private editor: Editor) {
+  constructor(editor: Editor) {
     editor.on('afterInsertion', ({ position, length }) => {
+      console.log('RunManager detected insertion at', position, 'length', length);
       this.onTextInsertion(position, length);
     });
     editor.on('afterDeletion', ({ position, length }) => {
@@ -64,11 +65,9 @@ export abstract class RunManager<T extends {} | null> {
         continue;
       }
 
-      // Case 2: Interval starts before and ends after deletion - split into two parts or shrink
+      // Case 2: Interval starts before and ends after deletion - shrink
       if (interval.start < position && interval.end > deleteEnd) {
-        // Deletion is in the middle - create two intervals
-        this.tree.insert(new Run(interval.start, position, interval.data));
-        this.tree.insert(new Run(position, interval.end - length, interval.data));
+        this.tree.insert(new Run(interval.start, interval.end - length, interval.data));
       }
       // Case 3: Interval starts before deletion - trim the end
       else if (interval.start < position && interval.end > position) {
@@ -77,6 +76,11 @@ export abstract class RunManager<T extends {} | null> {
       // Case 4: Interval ends after deletion - trim the start and shift
       else if (interval.start < deleteEnd && interval.end > deleteEnd) {
         this.tree.insert(new Run(position, interval.end - length, interval.data));
+      } else {
+        // XXX: this may be a reason to rethink findOverlappingNodes implementation
+        // findOverlap is inclusive on both ends, so intervals that overlap at the boundary
+        // but do not actually cover any deleted text will be returned. Reinsert them unchanged.
+        this.tree.insert(interval);
       }
     }
 

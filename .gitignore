@@ -7,3 +7,4 @@ out
 *.log*
 *.tsbuildinfo
 .turbo/preferences/tui.json
+packages/editor-react/src/compiledStyles.css

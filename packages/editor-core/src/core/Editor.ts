@@ -160,7 +160,7 @@ export class Editor extends EventEmitter<EditorEvents> {
         marginLeft: 20,
         marginRight: 300,
         lineHeight: 1.5,
-        align: 'justify',
+        align: 'left',
       },
       {
         marginLeft: 20,
@@ -475,15 +475,16 @@ export class Editor extends EventEmitter<EditorEvents> {
       : this.cursorManager.getPosition();
 
     this.pieceTable.insert(text, currentPosition);
-    this.textParser.reparseParagraph(currentPosition, text.length);
-    this.cursorManager.moveRight(text.length);
-
     // Emit afterInsertion event
     this.emit('afterInsertion', {
       text,
       position: currentPosition,
       length: text.length,
     });
+    this.textParser.reparseParagraph(currentPosition, text.length);
+    this.cursorManager.moveRight(text.length);
+
+    console.log('Inserted text:', JSON.stringify(text), 'at position', currentPosition);
   }
 
   /**
@@ -599,6 +600,13 @@ export class Editor extends EventEmitter<EditorEvents> {
       const charBefore = this.pieceTable.getRangeText(currentPosition - 1, 1);
       // Delete the text first
       this.pieceTable.delete(currentPosition - 1, length);
+
+      // Emit afterDeletion event
+      this.emit('afterDeletion', {
+        position: currentPosition - length,
+        length,
+      });
+
       // Merge the paragraphs if a newline was deleted
       if (charBefore === '\n') this.textParser.mergeParagraphsAtLineBreak(currentPosition - 1);
       else this.textParser.reparseParagraph(currentPosition, -1);
@@ -606,14 +614,15 @@ export class Editor extends EventEmitter<EditorEvents> {
     // Case 2.2: Multiple characters
     else {
       this.pieceTable.delete(currentPosition - length, length);
+
+      // Emit afterDeletion event
+      this.emit('afterDeletion', {
+        position: currentPosition - length,
+        length,
+      });
+
       this.textParser.deleteTextRangeDirectly(currentPosition - length, length);
     }
-
-    // Emit afterDeletion event
-    this.emit('afterDeletion', {
-      position: currentPosition - length,
-      length,
-    });
 
     // Re-split paragraphs into pages
     this.textParser.splitParagraphsIntoPages();
@@ -640,15 +649,14 @@ export class Editor extends EventEmitter<EditorEvents> {
     const { start, end } = selection;
     const selectionLength = end - start;
     this.pieceTable.delete(start, selectionLength);
-    this.textParser.deleteTextRangeDirectly(start, selectionLength);
-    this.cursorManager.setCursorPosition(start);
-    this.selectionManager.clearSelection();
-
     // Emit afterDeletion event
     this.emit('afterDeletion', {
       position: start,
       length: selectionLength,
     });
+    this.textParser.deleteTextRangeDirectly(start, selectionLength);
+    this.cursorManager.setCursorPosition(start);
+    this.selectionManager.clearSelection();
 
     return true;
   }
