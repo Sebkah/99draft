@@ -23,13 +23,6 @@
     "turbo": "^2.5.6",
     "typescript": "^5.8.3"
   },
-  "pnpm": {
-    "onlyBuiltDependencies": [
-      "@tailwindcss/oxide",
-      "electron",
-      "esbuild"
-    ]
-  },
   "dependencies": {
     "tsup": "^8.5.0"
   }
