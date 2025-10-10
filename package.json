@@ -10,7 +10,8 @@
     "lint": "turbo run lint",
     "format": "prettier --write .",
     "clean": "turbo run clean",
-    "test": "turbo run test"
+    "test": "turbo run test",
+    "release": "pnpm run build && changeset publish"
   },
   "packageManager": "pnpm@10.7.1",
   "overrides": {
