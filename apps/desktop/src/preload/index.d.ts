@@ -4,8 +4,8 @@ declare global {
   interface Window {
     electron: ElectronAPI & {
       ipcRenderer: {
-        on: (channel: string, callback: (...args: any[]) => void) => () => void;
-        send: (channel: string, ...args: any[]) => void;
+        on: (channel: string, callback: (...args: unknown[]) => void) => () => void;
+        send: (channel: string, ...args: unknown[]) => void;
       };
     };
     api: {

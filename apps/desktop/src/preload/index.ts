@@ -11,12 +11,13 @@ const api = {
 const enhancedElectronAPI = {
   ...electronAPI,
   ipcRenderer: {
-    on: (channel: string, callback: (...args: any[]) => void) => {
-      const subscription = (_event: any, ...args: any[]) => callback(...args);
+    on: (channel: string, callback: (...args: unknown[]) => void): (() => void) => {
+      const subscription = (_event: Electron.IpcRendererEvent, ...args: unknown[]): void =>
+        callback(...args);
       ipcRenderer.on(channel, subscription);
       return () => ipcRenderer.removeListener(channel, subscription);
     },
-    send: (channel: string, ...args: any[]) => ipcRenderer.send(channel, ...args),
+    send: (channel: string, ...args: unknown[]) => ipcRenderer.send(channel, ...args),
   },
 };
 

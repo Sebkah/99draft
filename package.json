@@ -10,9 +10,14 @@
     "lint": "turbo run lint",
     "format": "prettier --write .",
     "clean": "turbo run clean",
-    "test": "turbo run test"
+    "test": "turbo run test",
+    "release": "pnpm run build && changeset publish"
   },
   "packageManager": "pnpm@10.7.1",
+  "overrides": {
+    "@99draft/editor-core": "workspace:*",
+    "@99draft/editor-react": "workspace:*"
+  },
   "devDependencies": {
     "@changesets/cli": "^2.29.7",
     "prettier": "^3.5.3",
@@ -20,10 +25,6 @@
     "typescript": "^5.8.3"
   },
   "pnpm": {
-    "overrides": {
-      "@99draft/editor-core": "workspace:*",
-      "@99draft/editor-react": "workspace:*"
-    },
     "onlyBuiltDependencies": [
       "@tailwindcss/oxide",
       "electron",

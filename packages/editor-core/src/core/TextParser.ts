@@ -1,5 +1,5 @@
 import { Editor } from './Editor';
-import { PieceTable } from '../pieceTable/PieceTable';
+import { PieceTable } from '../PieceTable/PieceTable';
 import { Paragraph } from '../models/Paragraph';
 import { Page } from '../models/Page';
 import { Line } from '../models/Line';
