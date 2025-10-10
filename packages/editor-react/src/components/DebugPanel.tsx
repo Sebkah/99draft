@@ -372,7 +372,7 @@ const DebugPanel: React.FC<Props> = ({ editor }) => {
                               offset: l.offsetInParagraph,
                               length: l.length,
                               pixelLength: Math.round(l.pixelLength),
-                              words: l.wordpixelOffsets?.length ?? 0,
+                              words: 0,
                             });
                           }
                         }}

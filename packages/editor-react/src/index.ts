@@ -1,5 +1,5 @@
 // Import Tailwind styles
-import './styles.css';
+import './compiledStyles.css';
 
 // Main Canvas component
 export { default as Canvas } from './components/TextEditor';

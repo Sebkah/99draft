@@ -1,6 +1,6 @@
 {
   "name": "@99draft/desktop",
-  "version": "1.0.0",
+  "version": "0.0.1",
   "description": "99draft desktop application built with Electron",
   "main": "./out/main/index.js",
   "author": "99draft",
@@ -24,7 +24,6 @@
   "dependencies": {
     "@99draft/editor-core": "workspace:*",
     "@99draft/editor-react": "workspace:*",
-    "@99draft/tree-visualizer": "workspace:*",
     "@electron-toolkit/preload": "^3.0.1",
     "@electron-toolkit/utils": "^4.0.0",
     "motion": "^12.23.12"
@@ -50,5 +49,6 @@
     "tailwindcss": "^4.1.10",
     "typescript": "^5.8.3",
     "vite": "^6.2.6"
-  }
+  },
+  "private": true
 }
