@@ -1,7 +1,8 @@
 import { TextEditor } from '@99draft/editor-react';
 import { createElectronExportAdapters } from './electron-adapters/ExportAdapters';
+import type React from 'react';
 
-function App() {
+function App(): React.JSX.Element {
   // Create electron-specific export adapters
   const { exportHandlers, exportEventManager } = createElectronExportAdapters();
 
