@@ -10,6 +10,7 @@ import { ParagraphStylesManager } from '../styles/ParagraphStylesManager';
 import { StylesManager } from '../styles/StylesManager';
 import { EventEmitter } from '../utils/EventEmitter';
 import type { EditorEvents, DebugUpdateEvent } from '../types/EditorEvents';
+import { Run } from '../structures/Run';
 
 /**
  * Type definition for debugging piece table structure
@@ -144,7 +145,7 @@ export class Editor extends EventEmitter<EditorEvents> {
     this.pieceTable = new PieceTable(initialText, this.logger);
 
     // Initialize text renderer and input manager
-    this.stylesManager = new StylesManager(this);
+    this.stylesManager = new StylesManager(this, [new Run(0, 740, { bold: true })]);
     this.paragraphStylesManager = new ParagraphStylesManager(this, [
       {
         marginLeft: 45,
@@ -160,7 +161,7 @@ export class Editor extends EventEmitter<EditorEvents> {
         marginLeft: 20,
         marginRight: 300,
         lineHeight: 1.5,
-        align: 'left',
+        align: 'justify',
       },
       {
         marginLeft: 20,
@@ -367,6 +368,19 @@ export class Editor extends EventEmitter<EditorEvents> {
 
     // Update cached style runs for affected lines (more efficient than re-splitting)
     this.textParser.updateCachedStyleRuns(styleStart, styleEnd);
+
+    // If style change affects line breaks, we may need to re-split paragraphs into lines/pages
+    if (style === 'bold') {
+      // Reparse all afected paragraphs to account for potential line break changes
+      const startParagraphIndex = this.textParser.findParagraphIndexAtOffset(styleStart);
+      const endParagraphIndex = this.textParser.findParagraphIndexAtOffset(styleEnd);
+      for (let i = startParagraphIndex; i <= endParagraphIndex; i++) {
+        this.textParser.splitAllParagraphsIntoLines();
+      }
+
+      this.textParser.splitParagraphsIntoPages();
+      this.cursorManager.mapLinearToStructure();
+    }
 
     this.renderPages();
   }
@@ -627,9 +641,8 @@ export class Editor extends EventEmitter<EditorEvents> {
     // Re-split paragraphs into pages
     this.textParser.splitParagraphsIntoPages();
 
-    // Ensure cursor position is valid before setting it
-    const newCursorPos = Math.max(0, Math.min(this.pieceTable.length, currentPosition - length));
-    this.cursorManager.setCursorPosition(newCursorPos);
+    // Move cursor back
+    this.cursorManager.setCursorPosition(currentPosition - length);
 
     this.renderPages();
     this.emitDebugUpdate();

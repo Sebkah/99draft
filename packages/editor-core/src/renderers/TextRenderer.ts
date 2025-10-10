@@ -105,7 +105,7 @@ export class TextRenderer {
 
       // Build font string with styles
       const fontStyle = fontStyles.length > 0 ? fontStyles.join(' ') + ' ' : '';
-      ctx.font = `${fontStyle}16px Arial`;
+      ctx.font = `${fontStyle} 16px Arial`;
 
       // Apply text decorations (underline, strikethrough)
       // We'll render the text first, then add decorations

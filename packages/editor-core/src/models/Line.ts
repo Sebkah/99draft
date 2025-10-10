@@ -42,11 +42,57 @@ export class Line {
 
   private _justifyData?: JustifyData;
 
+  /**
+   * Measures the pixel width of a text substring within this line while accounting for style formatting
+   * @param ctx - Canvas rendering context for text measurement
+   * @param startOffset - Start offset within the line (0-based)
+   * @param endOffset - End offset within the line (0-based)
+   * @returns The accurate pixel width of the substring
+   */
+  private measureTextWithStyles(
+    ctx: CanvasRenderingContext2D,
+    startOffset: number,
+    endOffset: number,
+  ): number {
+    let totalWidth = 0;
+
+    // Measure text segments with proper formatting
+    for (const styleRun of this.styleRuns) {
+      // Calculate intersection of style run with the text range we want to measure
+      const runStart = Math.max(styleRun.start, startOffset);
+      const runEnd = Math.min(styleRun.end, endOffset);
+
+      if (runStart < runEnd) {
+        // Set appropriate font for this style run
+        if (styleRun.data.bold) {
+          ctx.font = 'bold 16px Arial';
+        } else {
+          ctx.font = '16px Arial';
+        }
+
+        const runText = this.text.substring(runStart, runEnd);
+        totalWidth += ctx.measureText(runText).width;
+      }
+    }
+
+    return totalWidth;
+  }
+
   /** Gets justification data, cache it   */
   getjustifyData(ctx: CanvasRenderingContext2D): JustifyData {
     if (this._justifyData === undefined) {
       const textTrimmed = this.text.trim();
-      const pixelLengthTrimmed = ctx.measureText(textTrimmed).width;
+
+      // Calculate accurate pixel length accounting for mixed formatting
+      let pixelLengthTrimmed = 0;
+
+      // Get the trimmed text start offset relative to line start
+      const trimStartOffset = this.text.indexOf(textTrimmed);
+      const trimEndOffset = trimStartOffset + textTrimmed.length;
+
+      // Use the helper method to measure the trimmed text with proper formatting
+      pixelLengthTrimmed = this.measureTextWithStyles(ctx, trimStartOffset, trimEndOffset);
+
       // Count spaces only in trimmed text to avoid including trailing spaces in calculation
       const spaceCount = (textTrimmed.match(/ /g) || []).length;
 

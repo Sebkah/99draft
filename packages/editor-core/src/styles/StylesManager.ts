@@ -11,10 +11,21 @@ type Styles = {
 
 export class StylesManager {
   private runManagers: Map<Style, BooleanRunManager>;
-  constructor(editor: Editor) {
+  constructor(editor: Editor, initialStyles?: Run<{ [key in Style]?: boolean }>[]) {
     this.runManagers = new Map();
     for (const style of booleanStyles) {
       this.runManagers.set(style, new BooleanRunManager(editor));
+    }
+
+    if (initialStyles) {
+      for (const run of initialStyles) {
+        for (const style of booleanStyles) {
+          const manager = this.runManagers.get(style)!;
+          if (run.data && run.data[style]) {
+            manager.enableStyle(run.start, run.end);
+          }
+        }
+      }
     }
   }
 
@@ -87,12 +98,15 @@ export class StylesManager {
   getRunsOverlappingRange(
     start: number,
     end: number,
+    styleFilter?: Array<Style>,
   ): Run<{
     [key in Style]?: boolean;
   }>[] {
     // Get all runs from all styles that overlap with the range, keeping track of which style each run belongs to
     const runsByStyle = new Map<Style, Run<null>[]>();
     for (const style of booleanStyles) {
+      if (styleFilter && !styleFilter.includes(style)) continue;
+
       const manager = this.runManagers.get(style) as BooleanRunManager;
       runsByStyle.set(style, manager.getRunsOverlappingRange(start, end));
     }
@@ -123,6 +137,7 @@ export class StylesManager {
 
       // Check which styles have runs overlapping this segment
       for (const style of booleanStyles) {
+        if (styleFilter && !styleFilter.includes(style)) continue;
         const runs = runsByStyle.get(style)!;
         const hasOverlap = runs.some((run) => run.overlaps(segment));
         if (hasOverlap) {

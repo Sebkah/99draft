@@ -29,11 +29,6 @@ export class TextParser extends EventEmitter<TextParserEvents> {
 
     this.paragraphStylesManager = editor.paragraphStylesManager;
 
-    this.paragraphStylesManager.on('paragraphAlignChange', (event) => {
-      /*       const { paragraphIndex } = event;
-      this.splitParagraphIntoLines(paragraphIndex); */
-    });
-
     this.splitIntoParagraphs();
 
     this.splitAllParagraphsIntoLines();
@@ -335,19 +330,36 @@ export class TextParser extends EventEmitter<TextParserEvents> {
 
     const wrappingWidth = this.editor.internalCanvas.width - marginLeft - marginRight;
 
-    const maxWidth = wrappingWidth;
-
-    // Calculate the width of a single space character
-    const spaceWidth = this.ctx.measureText(' ').width;
-
-    // Split while preserving spaces (using regex to keep spaces in the array)
-    const tokens = paragraph.text.split(/(\s+)/);
-
     const lines: Line[] = [];
 
     let offsetInParagraph = 0;
     let currentLine = '';
     let currentLineWidth = 0;
+
+    // Get the styles that affect parsing (changing font weight, size, family would affect measurements)
+    const styleRuns = this.editor.stylesManager.getRunsOverlappingRange(
+      paragraph.offset,
+      paragraph.offset + paragraph.length,
+      ['bold'],
+    );
+
+    // Divide the paragraph text into those runs
+    const textSegments = styleRuns.map((run) => {
+      // The run coordinates are already relative to the range start (paragraph.offset)
+      // So run.start and run.end are already paragraph-relative
+      const text = paragraph.text.substring(run.start, run.end);
+
+      return { text, styles: run.data };
+    });
+
+    // Helper function to set canvas font based on styles
+    const setCanvasFont = (styles: any): void => {
+      if (styles.bold) {
+        this.ctx.font = 'bold 16px Arial';
+      } else {
+        this.ctx.font = '16px Arial';
+      }
+    };
 
     // Helper function to create a line with cached style runs
     const createLine = (lineText: string, lineOffset: number, lineWidth: number): Line => {
@@ -368,61 +380,74 @@ export class TextParser extends EventEmitter<TextParserEvents> {
         lineOffset,
         lineLength,
         lineWidth,
-        maxWidth - lineWidth,
+        wrappingWidth - lineWidth,
         wrappingWidth,
         styleRuns,
       );
     };
 
-    tokens.forEach((token) => {
-      // 1. Token is spaces only
-      if (token.trim() === '') {
-        // Width of spaces added so far in this sequence
-        let currentSpaceWidth = 0;
+    textSegments.forEach((segment) => {
+      const segmentTokens = segment.text.split(/(\s+)/);
 
-        // Process spaces one by one to allow breaking within space sequences
-        for (let i = 0; i < token.length; i++) {
-          // Test if adding one more space exceeds the max width
-          const testWidth = currentLineWidth + currentSpaceWidth + spaceWidth;
-          if (testWidth > maxWidth) {
-            // If adding this space exceeds the max width, finish the current line
+      // Set canvas font based on segment styles for space width calculation
+      setCanvasFont(segment.styles);
+
+      // Calculate the width of a single space character with current font
+      const spaceWidth = this.ctx.measureText(' ').width;
+
+      segmentTokens.forEach((token) => {
+        // Ensure font is set correctly for this token's measurement
+        setCanvasFont(segment.styles);
+
+        // 1. Token is spaces only
+        if (token.trim() === '') {
+          // Width of spaces added so far in this sequence
+          let currentSpaceWidth = 0;
+
+          // Process spaces one by one to allow breaking within space sequences
+          for (let i = 0; i < token.length; i++) {
+            // Test if adding one more space exceeds the max width
+            const testWidth = currentLineWidth + currentSpaceWidth + spaceWidth;
+            if (testWidth > wrappingWidth) {
+              // If adding this space exceeds the max width, finish the current line
+              lines.push(createLine(currentLine, offsetInParagraph, currentLineWidth));
+
+              offsetInParagraph += currentLine.length;
+
+              // Start a new line with the current space
+              currentLine = ' ';
+              currentSpaceWidth = spaceWidth;
+              currentLineWidth = spaceWidth;
+            } else {
+              // Space fits on current line, add it
+              currentLine += ' ';
+              currentSpaceWidth += spaceWidth;
+              currentLineWidth += spaceWidth;
+            }
+          }
+          // Continue to next token
+          return;
+        }
+
+        // 2. Token is a regular word/token (not just spaces)
+        if (token.trim()) {
+          // Measure token width with the correct font context
+          const tokenWidth = this.ctx.measureText(token).width;
+          const testLine = currentLine + token;
+
+          if (currentLineWidth + tokenWidth > wrappingWidth) {
+            // Line is too long, push the current line...
             lines.push(createLine(currentLine, offsetInParagraph, currentLineWidth));
-
             offsetInParagraph += currentLine.length;
 
-            // Start a new line with the current space
-            currentLine = ' ';
-            currentSpaceWidth = spaceWidth;
-            currentLineWidth = spaceWidth;
+            currentLine = token;
+            currentLineWidth = tokenWidth;
           } else {
-            // Space fits on current line, add it
-            currentLine += ' ';
-            currentSpaceWidth += spaceWidth;
-            currentLineWidth += spaceWidth;
+            currentLine = testLine;
+            currentLineWidth += tokenWidth;
           }
         }
-        // Continue to next token
-        return;
-      }
-
-      // 2. Token is a regular word/token (not just spaces)
-      if (token.trim()) {
-        // Recalculate testLine and metrics after spaces have been processed
-        const tokenWidth = this.ctx.measureText(token).width;
-        const testLine = currentLine + token;
-
-        if (currentLineWidth + tokenWidth > maxWidth) {
-          // Line is too long, push the current line...
-          lines.push(createLine(currentLine, offsetInParagraph, currentLineWidth));
-          offsetInParagraph += currentLine.length;
-
-          currentLine = token;
-          currentLineWidth = tokenWidth;
-        } else {
-          currentLine = testLine;
-          currentLineWidth += tokenWidth;
-        }
-      }
+      });
     });
 
     // Push any remaining text as the last line
@@ -430,7 +455,6 @@ export class TextParser extends EventEmitter<TextParserEvents> {
     if (currentLine.length > 0 || lines.length === 0) {
       lines.push(createLine(currentLine, offsetInParagraph, currentLineWidth));
     }
-
     paragraph.setLines(lines);
   }
 
