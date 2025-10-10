@@ -58,6 +58,15 @@ export abstract class RunManager<T extends {} | null> {
 
     for (const node of overlappingNodes) {
       const interval = node.interval;
+
+      // XXX: this may be a reason to rethink findOverlappingNodes implementation
+      // findOverlap is inclusive on both ends, so intervals that overlap at the boundary
+      // but do not actually cover any deleted text will be returned. Skip these.
+      if (interval.end <= position || interval.start >= deleteEnd) {
+        // No actual overlap, skip
+        continue;
+      }
+
       this.tree.delete(interval);
 
       // Case 1: Interval completely within deleted range - don't reinsert
@@ -76,11 +85,6 @@ export abstract class RunManager<T extends {} | null> {
       // Case 4: Interval ends after deletion - trim the start and shift
       else if (interval.start < deleteEnd && interval.end > deleteEnd) {
         this.tree.insert(new Run(position, interval.end - length, interval.data));
-      } else {
-        // XXX: this may be a reason to rethink findOverlappingNodes implementation
-        // findOverlap is inclusive on both ends, so intervals that overlap at the boundary
-        // but do not actually cover any deleted text will be returned. Reinsert them unchanged.
-        this.tree.insert(interval);
       }
     }
 
