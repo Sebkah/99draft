@@ -1,4 +1,4 @@
-import { PieceTable } from '../pieceTable/PieceTable';
+import { PieceTable } from '../PieceTable/PieceTable';
 
 import { InputManager } from '../managers/InputManager';
 import { TextParser } from './TextParser';

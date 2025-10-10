@@ -3,8 +3,8 @@ export { Editor } from './core/Editor';
 export type { DebugConfig, PieceDebug } from './core/Editor';
 
 // Core data structures
-export { PieceTable } from './pieceTable/PieceTable';
-export type { Piece } from './pieceTable/PieceTable';
+export { PieceTable } from './PieceTable/PieceTable';
+export type { Piece } from './PieceTable/PieceTable';
 
 // Text processing
 export { TextParser } from './core/TextParser';
@@ -41,4 +41,3 @@ export { Line } from './models/Line';
 
 // Data structures
 export { RedBlackIntervalTree, RedBlackNode, NodeColor } from './structures/RedBlackIntervalTree';
-
