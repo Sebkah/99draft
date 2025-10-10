@@ -27,10 +27,24 @@ export abstract class RunManager<T extends {} | null> {
     for (const node of containingNodes) {
       const interval = node.interval;
 
+      console.log(
+        'Extending interval',
+        interval,
+        'due to insertion at',
+        position,
+        'length',
+        length,
+      );
+
       // XXX: this may be a reason to rethink findOverlappingNodes implementation
       // findOverlap is inclusive on both ends, so intervals that overlap at the boundary
       // but do not actually cover any deleted text will be returned. Skip these.
-      if (interval.end <= position || interval.start >= insertEnd) {
+      if (
+        interval.end === position ||
+        interval.start === insertEnd ||
+        interval.start === position
+      ) {
+        console.log('Skipping extension for interval', interval);
         // No actual overlap, skip
         continue;
       }
@@ -42,18 +56,26 @@ export abstract class RunManager<T extends {} | null> {
 
     // 2. Find all intervals starting at or after the insertion position and shift them
     // Must reinsert since start position (BST key) changes
-    const affectedNodes = this.tree.findInRangeNodes(position, Infinity);
-    const updatedAffected: Run<T>[] = [];
+    const affectedNodes = this.tree.findInRangeNodes(insertEnd - 1, Infinity);
 
     for (const node of affectedNodes) {
       const interval = node.interval;
-      this.tree.delete(interval);
-      updatedAffected.push(new Run(interval.start + length, interval.end + length, interval.data));
-    }
 
-    // 3. Re-insert shifted intervals (tree will rebalance and maintain BST property)
-    for (const interval of updatedAffected) {
-      this.tree.insert(interval);
+      // XXX: this may be a reason to rethink findOverlappingNodes implementation
+      // findOverlap is inclusive on both ends, so intervals that overlap at the boundary
+      // but do not actually cover any deleted text will be returned. Skip these.
+      if (interval.end === position || interval.start === insertEnd) {
+        console.log('Skipping extension for interval', interval);
+        // No actual overlap, skip
+        continue;
+      }
+
+      this.tree.delete(interval);
+
+      console.log('Shifting interval', interval, 'due to insertion at', position, 'length', length);
+
+      // Re-insert
+      this.tree.insert(new Run(interval.start + length, interval.end + length, interval.data));
     }
   }
 
@@ -73,7 +95,7 @@ export abstract class RunManager<T extends {} | null> {
       // XXX: this may be a reason to rethink findOverlappingNodes implementation
       // findOverlap is inclusive on both ends, so intervals that overlap at the boundary
       // but do not actually cover any deleted text will be returned. Skip these.
-      if (interval.end <= position || interval.start >= deleteEnd) {
+      if (interval.end === position || interval.start === deleteEnd) {
         // No actual overlap, skip
         continue;
       }
