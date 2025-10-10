@@ -69,6 +69,50 @@ export class TextParser extends EventEmitter<TextParserEvents> {
   }
 
   /**
+   * Update cached style runs for lines affected by a style change
+   * This is more efficient than re-splitting paragraphs into lines
+   * @param start - The start position of the style change
+   * @param end - The end position of the style change
+   */
+  public updateCachedStyleRuns(start: number, end: number): void {
+    // Find the paragraphs affected by this range
+    const startParagraphIndex = this.findParagraphIndexAtOffset(start);
+    const endParagraphIndex = this.findParagraphIndexAtOffset(Math.max(start, end - 1));
+
+    // Update each affected paragraph's lines
+    for (let pIndex = startParagraphIndex; pIndex <= endParagraphIndex; pIndex++) {
+      const paragraph = this.paragraphs[pIndex];
+
+      // Create new lines with updated style runs
+      const updatedLines = paragraph.lines.map((line) => {
+        // Calculate absolute positions for this line
+        const lineAbsoluteStart = paragraph.offset + line.offsetInParagraph;
+        const lineAbsoluteEnd = lineAbsoluteStart + line.length;
+
+        // Get updated style runs for this line
+        const styleRuns = this.editor.stylesManager.getRunsOverlappingRange(
+          lineAbsoluteStart,
+          lineAbsoluteEnd,
+        );
+
+        // Create a new Line instance with updated styleRuns
+        return new Line(
+          line.text,
+          line.offsetInParagraph,
+          line.length,
+          line.pixelLength,
+          line.freePixelSpace,
+          line.wrappingWidth,
+          styleRuns,
+        );
+      });
+
+      // Update the paragraph's lines
+      paragraph.setLines(updatedLines);
+    }
+  }
+
+  /**
    * Get the full text from the piece table
    */
   public getFullText(): string {
@@ -305,6 +349,31 @@ export class TextParser extends EventEmitter<TextParserEvents> {
     let currentLine = '';
     let currentLineWidth = 0;
 
+    // Helper function to create a line with cached style runs
+    const createLine = (lineText: string, lineOffset: number, lineWidth: number): Line => {
+      const lineLength = lineText.length;
+
+      // Get the absolute offset in the document for this line
+      const absoluteStart = paragraph.offset + lineOffset;
+      const absoluteEnd = absoluteStart + lineLength;
+
+      // Get style runs for this line range (returned with relative coordinates)
+      const styleRuns = this.editor.stylesManager.getRunsOverlappingRange(
+        absoluteStart,
+        absoluteEnd,
+      );
+
+      return new Line(
+        lineText,
+        lineOffset,
+        lineLength,
+        lineWidth,
+        maxWidth - lineWidth,
+        wrappingWidth,
+        styleRuns,
+      );
+    };
+
     tokens.forEach((token) => {
       // 1. Token is spaces only
       if (token.trim() === '') {
@@ -317,16 +386,7 @@ export class TextParser extends EventEmitter<TextParserEvents> {
           const testWidth = currentLineWidth + currentSpaceWidth + spaceWidth;
           if (testWidth > maxWidth) {
             // If adding this space exceeds the max width, finish the current line
-            lines.push(
-              new Line(
-                currentLine,
-                offsetInParagraph,
-                currentLine.length,
-                currentLineWidth,
-                maxWidth - currentLineWidth,
-                wrappingWidth,
-              ),
-            );
+            lines.push(createLine(currentLine, offsetInParagraph, currentLineWidth));
 
             offsetInParagraph += currentLine.length;
 
@@ -353,16 +413,7 @@ export class TextParser extends EventEmitter<TextParserEvents> {
 
         if (currentLineWidth + tokenWidth > maxWidth) {
           // Line is too long, push the current line...
-          lines.push(
-            new Line(
-              currentLine,
-              offsetInParagraph,
-              currentLine.length,
-              currentLineWidth,
-              maxWidth - currentLineWidth,
-              wrappingWidth,
-            ),
-          );
+          lines.push(createLine(currentLine, offsetInParagraph, currentLineWidth));
           offsetInParagraph += currentLine.length;
 
           currentLine = token;
@@ -377,16 +428,7 @@ export class TextParser extends EventEmitter<TextParserEvents> {
     // Push any remaining text as the last line
     // Always ensure at least one line exists (even for empty paragraphs with just a newline)
     if (currentLine.length > 0 || lines.length === 0) {
-      lines.push(
-        new Line(
-          currentLine,
-          offsetInParagraph,
-          currentLine.length,
-          currentLineWidth,
-          maxWidth - currentLineWidth,
-          wrappingWidth,
-        ),
-      );
+      lines.push(createLine(currentLine, offsetInParagraph, currentLineWidth));
     }
 
     paragraph.setLines(lines);

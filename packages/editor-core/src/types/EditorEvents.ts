@@ -16,6 +16,22 @@ export interface PageCountChangeEvent {
   previousPageCount: number;
 }
 
+export interface AfterInsertionEvent {
+  /** The text that was inserted */
+  text: string;
+  /** The position where text was inserted */
+  position: number;
+  /** Length of the inserted text */
+  length: number;
+}
+
+export interface AfterDeletionEvent {
+  /** The position where deletion started */
+  position: number;
+  /** Number of characters deleted */
+  length: number;
+}
+
 /**
  * Event map for Editor events
  */
@@ -24,4 +40,8 @@ export interface EditorEvents {
   debugUpdate: DebugUpdateEvent;
   /** Fired when the number of pages changes */
   pageCountChange: PageCountChangeEvent;
+  /** Fired after text has been inserted */
+  afterInsertion: AfterInsertionEvent;
+  /** Fired after text has been deleted */
+  afterDeletion: AfterDeletionEvent;
 }

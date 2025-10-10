@@ -23,6 +23,7 @@ export { SelectionManager } from './managers/SelectionManager';
 export { EventEmitter } from './utils/EventEmitter';
 export type { EventMap } from './utils/EventEmitter';
 export type { CursorChangeEvent, CursorManagerEvents } from './types/CursorEvents';
+export type { SelectionChangeEvent, SelectionManagerEvents } from './types/SelectionEvents';
 export type { DebugUpdateEvent, PageCountChangeEvent, EditorEvents } from './types/EditorEvents';
 export type { TextParserEvents } from './types/TextParserEvents';
 
@@ -37,3 +38,7 @@ export type { EditorLogger } from './managers/EditorLogger';
 export { Page } from './models/Page';
 export { Paragraph } from './models/Paragraph';
 export { Line } from './models/Line';
+
+// Data structures
+export { RedBlackIntervalTree, RedBlackNode, NodeColor } from './structures/RedBlackIntervalTree';
+

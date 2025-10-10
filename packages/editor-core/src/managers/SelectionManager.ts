@@ -1,11 +1,13 @@
 import { Editor } from '../core/Editor';
 import { CursorManager, MousePosition } from './CursorManager';
+import { EventEmitter } from '../utils/EventEmitter';
+import type { SelectionManagerEvents, SelectionChangeEvent } from '../types/SelectionEvents';
 
 /**
  * Manages text selection state and operations within the editor
  * Handles mouse-based selection, selection boundaries, and selection queries
  */
-export class SelectionManager {
+export class SelectionManager extends EventEmitter<SelectionManagerEvents> {
   private editor: Editor;
   private cursorManager: CursorManager;
 
@@ -14,6 +16,7 @@ export class SelectionManager {
   private isSelecting: boolean = false;
 
   constructor(editor: Editor, cursorManager: CursorManager) {
+    super();
     this.editor = editor;
     this.cursorManager = cursorManager;
   }
@@ -60,6 +63,7 @@ export class SelectionManager {
       start: Math.min(currentCursorPos, endPointCursorPos),
       end: Math.max(currentCursorPos, endPointCursorPos),
     };
+    this.emitSelectionChange();
   }
 
   /**
@@ -93,6 +97,7 @@ export class SelectionManager {
     } else {
       this.selection = null;
     }
+    this.emitSelectionChange();
   }
 
   /**
@@ -101,6 +106,7 @@ export class SelectionManager {
   clearSelection(): void {
     this.selection = null;
     this.isSelecting = false;
+    this.emitSelectionChange();
   }
 
   /**
@@ -143,6 +149,20 @@ export class SelectionManager {
         start: 0,
         end: textLength,
       };
+      this.emitSelectionChange();
     }
+  }
+
+  /**
+   * Emits a selectionChange event with current selection state
+   * @private
+   */
+  private emitSelectionChange(): void {
+    const event: SelectionChangeEvent = {
+      selection: this.selection,
+      hasSelection: this.hasSelection(),
+      selectedText: this.getSelectedText(),
+    };
+    this.emit('selectionChange', event);
   }
 }

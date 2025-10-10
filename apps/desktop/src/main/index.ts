@@ -41,6 +41,7 @@ function createWindow(): BrowserWindow {
   return mainWindow;
 }
 
+
 /**
  * Creates the application menu with PDF export functionality
  */
@@ -101,6 +102,7 @@ function createApplicationMenu(mainWindow: BrowserWindow): void {
         { role: 'togglefullscreen' },
       ],
     },
+   
   ];
 
   const menu = Menu.buildFromTemplate(template as any);

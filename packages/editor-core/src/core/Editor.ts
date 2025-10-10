@@ -7,6 +7,7 @@ import { SelectionManager } from '../managers/SelectionManager';
 import { createEditorLogger, type EditorLogger } from '../managers/EditorLogger';
 import { TextRenderer, PDFRenderer, DOCXRenderer } from '..';
 import { ParagraphStylesManager } from '../styles/ParagraphStylesManager';
+import { StylesManager } from '../styles/StylesManager';
 import { EventEmitter } from '../utils/EventEmitter';
 import type { EditorEvents, DebugUpdateEvent } from '../types/EditorEvents';
 
@@ -75,6 +76,7 @@ export class Editor extends EventEmitter<EditorEvents> {
   public selectionManager: SelectionManager;
 
   public paragraphStylesManager: ParagraphStylesManager;
+  public stylesManager: StylesManager;
 
   public margins: { left: number; right: number; top: number; bottom: number } = {
     left: 50,
@@ -142,6 +144,7 @@ export class Editor extends EventEmitter<EditorEvents> {
     this.pieceTable = new PieceTable(initialText, this.logger);
 
     // Initialize text renderer and input manager
+    this.stylesManager = new StylesManager(this);
     this.paragraphStylesManager = new ParagraphStylesManager(this, [
       {
         marginLeft: 45,
@@ -304,6 +307,103 @@ export class Editor extends EventEmitter<EditorEvents> {
   }
 
   /**
+   * Toggle bold style for the current selection or at cursor position
+   */
+  toggleBold(): void {
+    this.toggleStyleInternal('bold');
+  }
+
+  /**
+   * Toggle italic style for the current selection or at cursor position
+   */
+  toggleItalic(): void {
+    this.toggleStyleInternal('italic');
+  }
+
+  /**
+   * Toggle underline style for the current selection or at cursor position
+   */
+  toggleUnderline(): void {
+    this.toggleStyleInternal('underline');
+  }
+
+  /**
+   * Toggle strikethrough style for the current selection or at cursor position
+   */
+  toggleStrikethrough(): void {
+    this.toggleStyleInternal('strikethrough');
+  }
+
+  /**
+   * Internal method to toggle a style on the current selection or at cursor position
+   * @param style - The style to toggle: 'bold', 'italic', 'underline', or 'strikethrough'
+   */
+  private toggleStyleInternal(style: 'bold' | 'italic' | 'underline' | 'strikethrough'): void {
+    const selection = this.selectionManager.getSelection();
+    let styleStart: number;
+    let styleEnd: number;
+
+    if (selection) {
+      // Apply style to selection
+      styleStart = selection.start;
+      styleEnd = selection.end;
+      this.stylesManager.toggleStyle(style, styleStart, styleEnd);
+    } else {
+      // No selection - apply style at cursor position (affects next character typed)
+      const cursorPos = this.cursorManager.getPosition();
+      // For now, we'll apply the style to a zero-width range
+      // This will be used when the user starts typing
+      // TODO: Implement "pending style" feature for better UX
+      if (cursorPos > 0) {
+        // Apply to the previous character as a visual indicator
+        styleStart = cursorPos - 1;
+        styleEnd = cursorPos;
+        this.stylesManager.toggleStyle(style, styleStart, styleEnd);
+      } else {
+        // At the beginning of document, nothing to do
+        return;
+      }
+    }
+
+    // Update cached style runs for affected lines (more efficient than re-splitting)
+    this.textParser.updateCachedStyleRuns(styleStart, styleEnd);
+
+    this.renderPages();
+  }
+
+  /**
+   * Get the active styles at the current cursor position or for the current selection
+   * @returns An object with boolean flags for each style
+   */
+  getActiveStyles(): {
+    bold: boolean;
+    italic: boolean;
+    underline: boolean;
+    strikethrough: boolean;
+  } {
+    const selection = this.selectionManager.getSelection();
+
+    if (selection) {
+      const styles = this.stylesManager.getStylesOverRange(selection.start, selection.end);
+      return {
+        bold: styles.bold ?? false,
+        italic: styles.italic ?? false,
+        underline: styles.underline ?? false,
+        strikethrough: styles.strikethrough ?? false,
+      };
+    }
+
+    const styles = this.stylesManager.getStylesAt(this.cursorManager.getPosition());
+
+    return {
+      bold: styles.bold ?? false,
+      italic: styles.italic ?? false,
+      underline: styles.underline ?? false,
+      strikethrough: styles.strikethrough ?? false,
+    };
+  }
+
+  /**
    * Update the margins using stored values and canvas reference
    * @param leftMargin - Optional left margin override
    * @param rightMargin - Optional right margin override
@@ -377,6 +477,13 @@ export class Editor extends EventEmitter<EditorEvents> {
     this.pieceTable.insert(text, currentPosition);
     this.textParser.reparseParagraph(currentPosition, text.length);
     this.cursorManager.moveRight(text.length);
+
+    // Emit afterInsertion event
+    this.emit('afterInsertion', {
+      text,
+      position: currentPosition,
+      length: text.length,
+    });
   }
 
   /**
@@ -394,6 +501,13 @@ export class Editor extends EventEmitter<EditorEvents> {
     this.textParser.splitParagraphDirectly(currentPosition);
 
     this.cursorManager.moveRight(1);
+
+    // Emit afterInsertion event for line break
+    this.emit('afterInsertion', {
+      text: '\n',
+      position: currentPosition,
+      length: 1,
+    });
   }
 
   /**
@@ -495,6 +609,12 @@ export class Editor extends EventEmitter<EditorEvents> {
       this.textParser.deleteTextRangeDirectly(currentPosition - length, length);
     }
 
+    // Emit afterDeletion event
+    this.emit('afterDeletion', {
+      position: currentPosition - length,
+      length,
+    });
+
     // Re-split paragraphs into pages
     this.textParser.splitParagraphsIntoPages();
 
@@ -523,6 +643,12 @@ export class Editor extends EventEmitter<EditorEvents> {
     this.textParser.deleteTextRangeDirectly(start, selectionLength);
     this.cursorManager.setCursorPosition(start);
     this.selectionManager.clearSelection();
+
+    // Emit afterDeletion event
+    this.emit('afterDeletion', {
+      position: start,
+      length: selectionLength,
+    });
 
     return true;
   }

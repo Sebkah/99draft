@@ -15,10 +15,18 @@
     "moduleResolution": "bundler",
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
     "paths": {
-      "@renderer/*": ["src/renderer/src/*"],
-      "@99draft/editor-core": ["../../packages/editor-core/src"],
-      "@99draft/editor-react": ["../../packages/editor-react/src"]
+      "@renderer/*": [
+        "src/renderer/src/*"
+      ],
+      "@99draft/editor-core": [
+        "../../packages/editor-core/src"
+      ],
+      "@99draft/editor-react": [
+        "../../packages/editor-react/src"
+      ]
     }
   }
 }
