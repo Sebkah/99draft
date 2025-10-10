@@ -22,8 +22,19 @@ export abstract class RunManager<T extends {} | null> {
     // 1. Find all intervals containing the insertion position and extend their end
     // No need to reinsert since start position (BST key) doesn't change
     const containingNodes = this.tree.findContainingNodes(position);
+    const insertEnd = position + length;
 
     for (const node of containingNodes) {
+      const interval = node.interval;
+
+      // XXX: this may be a reason to rethink findOverlappingNodes implementation
+      // findOverlap is inclusive on both ends, so intervals that overlap at the boundary
+      // but do not actually cover any deleted text will be returned. Skip these.
+      if (interval.end <= position || interval.start >= insertEnd) {
+        // No actual overlap, skip
+        continue;
+      }
+
       node.interval.end += length;
       // Update maxEndValue augmentation for this node and ancestors
       this.tree.updateNodeAndAncestors(node);
