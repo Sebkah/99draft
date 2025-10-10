@@ -11,6 +11,19 @@ type Styles = {
 
 export class StylesManager {
   private runManagers: Map<Style, BooleanRunManager>;
+
+  private pendingStyle: Styles | null = null;
+
+  setPendingStyle(style: Style, position: number) {
+    if (!this.pendingStyle) {
+      this.pendingStyle = {};
+    }
+
+    //Set it to the inverse of current state
+    const currentStyles = this.getStylesAt(position);
+    this.pendingStyle[style] = !currentStyles[style];
+  }
+
   constructor(editor: Editor, initialStyles?: Run<{ [key in Style]?: boolean }>[]) {
     this.runManagers = new Map();
     for (const style of booleanStyles) {
@@ -27,6 +40,16 @@ export class StylesManager {
         }
       }
     }
+
+    editor.on('afterInsertion', ({ position, length }) => {
+      if (this.pendingStyle) {
+        for (const style of Object.keys(this.pendingStyle) as Style[]) {
+          const manager = this.runManagers.get(style)!;
+          manager.enableStyle(position, position + length);
+        }
+        this.pendingStyle = null;
+      }
+    });
   }
 
   toggleStyle(style: Style, start: number, end: number) {
@@ -52,7 +75,7 @@ export class StylesManager {
    */
   getStyleValueAt(style: Style, position: number): boolean {
     const manager = this.runManagers.get(style) as BooleanRunManager;
-    return manager.getStyleValueAt(position);
+    return manager.getRunValueAt(position);
   }
 
   /**
@@ -62,9 +85,13 @@ export class StylesManager {
    */
   getStylesAt(position: number): Styles {
     const styles: Styles = {};
+    if (this.pendingStyle) {
+      return this.pendingStyle;
+    }
+
     for (const style of booleanStyles) {
       const manager = this.runManagers.get(style) as BooleanRunManager;
-      const isActive = manager.getStyleValueAt(position);
+      const isActive = manager.getRunValueAt(position);
       if (isActive) {
         styles[style] = true;
       }
@@ -76,7 +103,7 @@ export class StylesManager {
     const styles: Styles = {};
     for (const style of booleanStyles) {
       const manager = this.runManagers.get(style) as BooleanRunManager;
-      const isActive = manager.getStyleValueOverRange(start, end);
+      const isActive = manager.getRunValueOverRange(start, end);
       if (isActive) {
         styles[style] = true;
       }

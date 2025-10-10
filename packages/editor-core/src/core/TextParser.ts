@@ -226,7 +226,7 @@ export class TextParser extends EventEmitter<TextParserEvents> {
 
   public splitAllParagraphsIntoLines(): void {
     for (let i = 0; i < this.paragraphs.length; i++) {
-      this.splitParagraphIntoLines(i);
+      this.wrapParagraphLines(i);
     }
   }
 
@@ -258,7 +258,7 @@ export class TextParser extends EventEmitter<TextParserEvents> {
       this.paragraphs[i].shiftOffset(editLength);
     }
 
-    this.splitParagraphIntoLines(paragraphIndex);
+    this.wrapParagraphLines(paragraphIndex);
   }
 
   // Split the text into paragraphs based on newlines
@@ -315,7 +315,7 @@ export class TextParser extends EventEmitter<TextParserEvents> {
   }
 
   // Split a paragraph into lines based on the canvas width
-  public splitParagraphIntoLines(paragraphIndex: number): void {
+  public wrapParagraphLines(paragraphIndex: number): void {
     const paragraph = this.paragraphs[paragraphIndex];
 
     // Ensure canvas context has correct font for measurements
@@ -553,8 +553,8 @@ export class TextParser extends EventEmitter<TextParserEvents> {
     this.paragraphStylesManager.splitParagraph(paragraphIndex);
 
     // Only reparse the affected paragraphs into lines
-    this.splitParagraphIntoLines(paragraphIndex);
-    this.splitParagraphIntoLines(paragraphIndex + 1);
+    this.wrapParagraphLines(paragraphIndex);
+    this.wrapParagraphLines(paragraphIndex + 1);
   }
 
   /**
@@ -607,7 +607,7 @@ export class TextParser extends EventEmitter<TextParserEvents> {
     this.paragraphStylesManager.mergeWithNextParagraphStyle(beforeParagraphIndex, isParagraphEmpty);
 
     // Re-parse the merged paragraph into lines since its content changed
-    this.splitParagraphIntoLines(beforeParagraphIndex);
+    this.wrapParagraphLines(beforeParagraphIndex);
   }
 
   /**
@@ -690,7 +690,7 @@ export class TextParser extends EventEmitter<TextParserEvents> {
     }
 
     // Re-parse the merged paragraph into lines
-    this.splitParagraphIntoLines(startParagraphIndex);
+    this.wrapParagraphLines(startParagraphIndex);
   }
 
   public getParagraph(index: number): Paragraph | null {

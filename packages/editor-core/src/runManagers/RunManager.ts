@@ -39,11 +39,7 @@ export abstract class RunManager<T extends {} | null> {
       // XXX: this may be a reason to rethink findOverlappingNodes implementation
       // findOverlap is inclusive on both ends, so intervals that overlap at the boundary
       // but do not actually cover any deleted text will be returned. Skip these.
-      if (
-        interval.end === position ||
-        interval.start === insertEnd ||
-        interval.start === position
-      ) {
+      if (interval.start === insertEnd || interval.start === position) {
         console.log('Skipping extension for interval', interval);
         // No actual overlap, skip
         continue;

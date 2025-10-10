@@ -161,7 +161,7 @@ export class Editor extends EventEmitter<EditorEvents> {
         marginLeft: 20,
         marginRight: 300,
         lineHeight: 1.5,
-        align: 'justify',
+        align: 'left',
       },
       {
         marginLeft: 20,
@@ -284,7 +284,7 @@ export class Editor extends EventEmitter<EditorEvents> {
       marginRight,
     });
 
-    this.textParser.splitParagraphIntoLines(paragraphIndex);
+    this.textParser.wrapParagraphLines(paragraphIndex);
 
     this.textParser.splitParagraphsIntoPages();
 
@@ -349,40 +349,27 @@ export class Editor extends EventEmitter<EditorEvents> {
       styleStart = selection.start;
       styleEnd = selection.end;
       this.stylesManager.toggleStyle(style, styleStart, styleEnd);
-    } else {
-      // No selection - apply style at cursor position (affects next character typed)
-      const cursorPos = this.cursorManager.getPosition();
-      // For now, we'll apply the style to a zero-width range
-      // This will be used when the user starts typing
-      // TODO: Implement "pending style" feature for better UX
-      if (cursorPos > 0) {
-        // Apply to the previous character as a visual indicator
-        styleStart = cursorPos - 1;
-        styleEnd = cursorPos;
-        this.stylesManager.toggleStyle(style, styleStart, styleEnd);
+
+      // If style change affects line breaks, we may need to re-split paragraphs into lines/pages
+      if (style === 'bold') {
+        // Reparse all afected paragraphs to account for potential line break changes
+        const startParagraphIndex = this.textParser.findParagraphIndexAtOffset(styleStart);
+        const endParagraphIndex = this.textParser.findParagraphIndexAtOffset(styleEnd);
+        for (let i = startParagraphIndex; i <= endParagraphIndex; i++) {
+          this.textParser.splitAllParagraphsIntoLines();
+        }
+
+        this.textParser.splitParagraphsIntoPages();
+        this.cursorManager.mapLinearToStructure();
       } else {
-        // At the beginning of document, nothing to do
-        return;
-      }
-    }
-
-    // Update cached style runs for affected lines (more efficient than re-splitting)
-    this.textParser.updateCachedStyleRuns(styleStart, styleEnd);
-
-    // If style change affects line breaks, we may need to re-split paragraphs into lines/pages
-    if (style === 'bold') {
-      // Reparse all afected paragraphs to account for potential line break changes
-      const startParagraphIndex = this.textParser.findParagraphIndexAtOffset(styleStart);
-      const endParagraphIndex = this.textParser.findParagraphIndexAtOffset(styleEnd);
-      for (let i = startParagraphIndex; i <= endParagraphIndex; i++) {
-        this.textParser.splitAllParagraphsIntoLines();
+        this.textParser.updateCachedStyleRuns(styleStart, styleEnd);
       }
 
-      this.textParser.splitParagraphsIntoPages();
-      this.cursorManager.mapLinearToStructure();
+      this.renderPages();
+    } else {
+      this.stylesManager.setPendingStyle(style, this.cursorManager.getPosition());
+      return;
     }
-
-    this.renderPages();
   }
 
   /**

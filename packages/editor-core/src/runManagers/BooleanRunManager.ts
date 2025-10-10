@@ -92,8 +92,8 @@ export class BooleanRunManager extends RunManager<null> {
     this.toggleStyle(start, end);
   }
 
-  getStyleValueAt(position: number): boolean {
-    const nodes = this.tree.findOverlappingNodes(new Run(position, position + 1, null));
+  getRunValueAt(position: number): boolean {
+    const nodes = this.tree.findContainingNodes(position);
     return nodes.length > 0;
   }
 
@@ -101,7 +101,7 @@ export class BooleanRunManager extends RunManager<null> {
    * Checks if the entire range [start, end) is fully covered by formatting.
    * Returns true only if every position in the range is formatted (no gaps).
    */
-  getStyleValueOverRange(start: number, end: number): boolean {
+  getRunValueOverRange(start: number, end: number): boolean {
     const selection = new Run(start, end, null);
     const overlappingNodes = this.tree.findOverlappingNodes(selection);
     const intervals = overlappingNodes.map((node) => node.interval);
