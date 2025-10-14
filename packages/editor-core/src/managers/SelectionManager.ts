@@ -13,7 +13,8 @@ export class SelectionManager extends EventEmitter<SelectionManagerEvents> {
 
   // Selection state
   public selection: { start: number; end: number } | null = null;
-  private isSelecting: boolean = false;
+  private isPointerDown: boolean = false;
+  private isPointerDragging: boolean = false;
 
   constructor(editor: Editor, cursorManager: CursorManager) {
     super();
@@ -27,7 +28,7 @@ export class SelectionManager extends EventEmitter<SelectionManagerEvents> {
    */
   startSelection(mousePosition: MousePosition): void {
     this.selection = null;
-    this.isSelecting = true;
+    this.isPointerDown = true;
 
     // Move cursor to the starting position
     this.cursorManager.mapPixelCoordinateToStructure(
@@ -43,7 +44,8 @@ export class SelectionManager extends EventEmitter<SelectionManagerEvents> {
    * @param mousePosition The current mouse coordinates
    */
   updateSelection(mousePosition: MousePosition): void {
-    if (!this.isSelecting) return;
+    if (!this.isPointerDown) return;
+    this.isPointerDragging = true;
 
     const endPointInStructure = this.cursorManager.mapPixelCoordinateToStructure(
       mousePosition.x,
@@ -71,9 +73,10 @@ export class SelectionManager extends EventEmitter<SelectionManagerEvents> {
    * @param mousePosition The final mouse coordinates
    */
   endSelection(mousePosition: MousePosition): void {
-    if (!this.isSelecting) return;
+    if (!this.isPointerDown) return;
+    if (!this.isPointerDragging) return;
 
-    this.isSelecting = false;
+    this.isPointerDown = false;
     const endPointInStructure = this.cursorManager.mapPixelCoordinateToStructure(
       mousePosition.x,
       mousePosition.y,
@@ -105,7 +108,7 @@ export class SelectionManager extends EventEmitter<SelectionManagerEvents> {
    */
   clearSelection(): void {
     this.selection = null;
-    this.isSelecting = false;
+    this.isPointerDown = false;
     this.emitSelectionChange();
   }
 

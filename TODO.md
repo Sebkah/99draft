@@ -24,3 +24,7 @@
 ## ♻️ Refactors
 
 - Separate Editor concerns: interaction vs. pure text handling logic
+
+## Ideas
+
+- maybe only enable internal canvas use through a closure that automatically saves and restores

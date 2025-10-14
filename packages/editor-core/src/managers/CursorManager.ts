@@ -3,6 +3,7 @@ import { TextParser } from '../core/TextParser';
 import { EventEmitter } from '../utils/EventEmitter';
 import type { CursorManagerEvents, CursorChangeEvent } from '../types/CursorEvents';
 import type { SelectionManager } from './SelectionManager';
+import { Paragraph } from '..';
 
 export type StructurePosition = {
   pageIndex: number;
@@ -33,10 +34,6 @@ export class CursorManager extends EventEmitter<CursorManagerEvents> {
   private selectionManager?: SelectionManager;
 
   private ctx: CanvasRenderingContext2D;
-
-  private get measureText(): (text: string) => TextMetrics {
-    return this.ctx.measureText.bind(this.ctx);
-  }
 
   constructor(
     initialPosition: number = 0,
@@ -127,7 +124,7 @@ export class CursorManager extends EventEmitter<CursorManagerEvents> {
       }
     }
 
-    this.getLineAdjacentLinearPosition(this.linearPosition, 'above', true);
+    this.getLineAdjacentPosition('above', true);
   }
 
   public moveDown(): void {
@@ -141,7 +138,7 @@ export class CursorManager extends EventEmitter<CursorManagerEvents> {
       }
     }
 
-    this.getLineAdjacentLinearPosition(this.linearPosition, 'below', true);
+    this.getLineAdjacentPosition('below', true);
   }
 
   //TODO:
@@ -211,6 +208,7 @@ export class CursorManager extends EventEmitter<CursorManagerEvents> {
 
     // 3. Calculate the offset within the line in pixels
     if (lineIndex !== -1) {
+    
       const cursorOffsetInParagraph = cursorPosition - paragraph.offset;
       const line = paragraph.lines[lineIndex];
       const positionInLine = cursorOffsetInParagraph - line.offsetInParagraph;
@@ -345,204 +343,81 @@ export class CursorManager extends EventEmitter<CursorManagerEvents> {
     return targetParagraph.offset + targetLine.offsetInParagraph + characterIndex;
   }
 
-  public getLineAdjacentLinearPosition(
-    cursorPosition: number,
+  public getLineAdjacentPosition(
     direction: 'above' | 'below',
     moveCursor: boolean = true,
-  ): number {
+  ): { linearPosition: number; structurePosition: StructurePosition } {
     const paragraphs = this.textParser.getParagraphs();
 
     // Get current cursor position mapping
     const { paragraphIndex, lineIndex, pixelOffsetInLine } = this.structurePosition;
 
-    if (paragraphIndex === -1 || lineIndex === -1 || pixelOffsetInLine === -1) {
-      return cursorPosition;
-    }
+    // I. Determine which line to move to and in which paragraph
+    const { targetParagraphIndex, targetLineIndex } = this.getAdjacentTargetLine(
+      paragraphs,
+      paragraphIndex,
+      lineIndex,
+      direction,
+    );
 
-    const initialParagraph = paragraphs[paragraphIndex];
-    let targetParagraphIndex = paragraphIndex;
-    let targetLine = -1;
-
-    // 1 - Easy case we're not at first or last line
-    if (direction === 'above' && lineIndex > 0) {
-      targetLine = lineIndex - 1;
-    } else if (direction === 'below' && lineIndex < initialParagraph.lines.length - 1) {
-      targetLine = lineIndex + 1;
-    }
-
-    // 2 - We're at the first line and want to go up, or at the last line and want to go down
-    if (targetLine === -1) {
-      if (direction === 'above') {
-        // Move to the end of the previous paragraph if it exists
-        if (paragraphIndex > 0) {
-          targetParagraphIndex -= 1;
-          const previousParagraph = paragraphs[targetParagraphIndex];
-          targetLine = previousParagraph.lines.length - 1;
-        } else {
-          return cursorPosition; // Already at the top of the document
-        }
-      } else if (direction === 'below') {
-        // Move to the start of the next paragraph if it exists
-        if (paragraphIndex < paragraphs.length - 1) {
-          targetLine = 0;
-          targetParagraphIndex += 1;
-        } else {
-          return cursorPosition; // Already at the bottom of the document
-        }
-      }
-    }
+    // II. Calculate the character index in the target line based on pixel offset
     const targetParagraph = paragraphs[targetParagraphIndex];
+    const targetLine = targetParagraph.lines[targetLineIndex];
 
-    // Now find the character index in the target line based on pixelOffset
-    const line = targetParagraph.lines[targetLine];
+    // Explore with a binary search to find the character index that best matches the pixel offset
 
-    // Handle empty line quickly
-    // XXX: check this code out
-    if (!line.text || line.text.length === 0) {
-      console.log('Empty line, moving to start of line');
-      const newPos = targetParagraph.offset + line.offsetInParagraph;
-      if (moveCursor) {
-        // Find the correct page for this empty line
-        const pages = this.textParser.getPages();
-        let newPageIndex = -1;
-
-        for (let p = 0; p < pages.length; p++) {
-          const page = pages[p];
-          if (page.containsLine(targetParagraphIndex, targetLine)) {
-            newPageIndex = p;
-            break;
-          }
-        }
-
-        // Fallback to current page if not found (shouldn't happen)
-        if (newPageIndex === -1) {
-          newPageIndex = this.structurePosition.pageIndex;
-          console.warn('Empty line: Could not find page, using current page');
-        }
-
-        const previousPosition = this.linearPosition;
-        this.structurePosition = {
-          pageIndex: newPageIndex,
-          paragraphIndex: targetParagraphIndex,
-          lineIndex: targetLine,
-          characterIndex: 0,
-          pixelOffsetInLine: 0,
-        };
-        this.linearPosition = newPos;
-
-        // Emit events if position changed
-        if (this.linearPosition !== previousPosition) {
-          const event: CursorChangeEvent = {
-            position: this.linearPosition,
-            structurePosition: { ...this.structurePosition },
-            previousPosition: previousPosition,
-          };
-          this.emit('cursorChange', event);
-        }
+    let low = 0;
+    let high = targetLine.length;
+    let bestMatchIndex = 0;
+    let smallestDiff = Infinity;
+    let steps = 0;
+    while (low <= high) {
+      steps++;
+      const mid = Math.floor((low + high) / 2);
+      const midPixelOffset = targetLine.measureTextWithStyles(this.ctx, 0, mid);
+      const diff = Math.abs(midPixelOffset - pixelOffsetInLine);
+      if (diff < smallestDiff) {
+        smallestDiff = diff;
+        bestMatchIndex = mid;
       }
-      return newPos;
+      if (midPixelOffset < pixelOffsetInLine) {
+        low = mid + 1;
+      } else if (midPixelOffset > pixelOffsetInLine) {
+        high = mid - 1;
+      } else {
+        break; // Exact match
+      }
     }
 
-    // Start from the beginning of the identified word
-    let accumulatedWidth = 0;
-    let charIndex = 0;
-    let decided = false;
-    let finalPixelOffset = accumulatedWidth;
+    console.log(`Binary search steps: ${steps}`);
 
-    // Add characters one by one until we reach or exceed the pixelOffset
-    for (let i = 0; i < line.text.length; i++) {
-      const charWidth = line.measureTextWithStyles(this.ctx, i, i + 1);
-      const nextAccumulatedWidth = accumulatedWidth + charWidth;
+    console.log('Best match character index:', targetLine.text[bestMatchIndex], bestMatchIndex);
 
-      if (nextAccumulatedWidth > pixelOffsetInLine) {
-        const distanceToCurrent = Math.abs(accumulatedWidth - pixelOffsetInLine);
-        const distanceToNext = Math.abs(nextAccumulatedWidth - pixelOffsetInLine);
+    // III. Map back to linear position
+    const newLinearPosition =
+      targetParagraph.offset + targetLine.offsetInParagraph + bestMatchIndex;
+    const newStructurePosition: StructurePosition = {
+      pageIndex: -1, // Will be updated in mapLinearToStructure
+      paragraphIndex: targetParagraphIndex,
+      lineIndex: targetLineIndex,
+      characterIndex: bestMatchIndex,
+      pixelOffsetInLine: targetLine.measureTextWithStyles(this.ctx, 0, bestMatchIndex),
+    };
 
-        if (distanceToNext < distanceToCurrent) {
-          charIndex = i + 1;
-          finalPixelOffset = nextAccumulatedWidth;
-        } else {
-          charIndex = i;
-          finalPixelOffset = accumulatedWidth;
-        }
-        decided = true;
+    // Update page index in structure position
+    const pages = this.textParser.getPages();
+    for (let p = 0; p < pages.length; p++) {
+      const page = pages[p];
+      if (page.containsLine(targetParagraphIndex, targetLineIndex)) {
+        newStructurePosition.pageIndex = p;
         break;
       }
-
-      accumulatedWidth = nextAccumulatedWidth;
-      charIndex = i + 1;
-      finalPixelOffset = accumulatedWidth;
     }
 
-    // If we never exceeded pixelOffset, place cursor at end of line
-    if (!decided) {
-      charIndex = Math.min(charIndex, line.text.length);
-      finalPixelOffset = accumulatedWidth;
-    }
-
-    const newPos =
-      targetParagraph.offset + targetParagraph.lines[targetLine].offsetInParagraph + charIndex;
     if (moveCursor) {
-      // TODO: check this part of the code, it seems complex for something that should be simple
-      // Calculate the page index for the new position
-      const pages = this.textParser.getPages();
-      let newPageIndex = -1; // Start with invalid page to detect if we find one
-
-      for (let p = 0; p < pages.length; p++) {
-        const page = pages[p];
-        if (page.containsLine(targetParagraphIndex, targetLine)) {
-          newPageIndex = p;
-          break;
-        }
-      }
-
-      // If no page was found, log error and try to find the correct page
-      if (newPageIndex === -1) {
-        console.error(
-          'Cursor movement: Could not find page for paragraph',
-          targetParagraphIndex,
-          'line',
-          targetLine,
-        );
-        console.error('Available pages:', pages.length);
-        console.error('Current position:', this.structurePosition);
-
-        // Fallback: find the page that contains this paragraph
-        for (let p = 0; p < pages.length; p++) {
-          const page = pages[p];
-          if (page.containsParagraph(targetParagraphIndex)) {
-            newPageIndex = p;
-            console.warn(
-              'Fallback: Using page',
-              p,
-              'which contains paragraph',
-              targetParagraphIndex,
-            );
-            break;
-          }
-        }
-
-        // Last resort: use current page
-        if (newPageIndex === -1) {
-          newPageIndex = this.structurePosition.pageIndex;
-          console.warn('Last resort: Using current page index', newPageIndex);
-        }
-      }
-
-      console.log(
-        `Moving cursor ${direction} to paragraph ${targetParagraphIndex}, line ${targetLine}, char ${charIndex} (page ${newPageIndex})`,
-      );
-
       const previousPosition = this.linearPosition;
-      this.structurePosition = {
-        pageIndex: newPageIndex,
-        paragraphIndex: targetParagraphIndex,
-        lineIndex: targetLine,
-        characterIndex: charIndex,
-        pixelOffsetInLine: finalPixelOffset,
-      };
-      this.linearPosition = newPos;
-
+      this.linearPosition = newLinearPosition;
+      this.structurePosition = newStructurePosition;
       // Emit events if position changed
       if (this.linearPosition !== previousPosition) {
         const event: CursorChangeEvent = {
@@ -553,6 +428,50 @@ export class CursorManager extends EventEmitter<CursorManagerEvents> {
         this.emit('cursorChange', event);
       }
     }
-    return newPos;
+    return { linearPosition: newLinearPosition, structurePosition: newStructurePosition };
+  }
+
+  private getAdjacentTargetLine(
+    paragraphs: Paragraph[],
+    paragraphIndex: number,
+    lineIndex: number,
+    direction: 'above' | 'below',
+  ): { targetParagraphIndex: number; targetLineIndex: number } {
+    const initialParagraph = paragraphs[paragraphIndex];
+    let targetParagraphIndex = paragraphIndex;
+    let targetLine = -1;
+
+    // 1 - Easy case: we're not at first or last line (we stay in the same paragraph)
+    // Not the first line
+    if (direction === 'above' && lineIndex > 0) {
+      targetLine = lineIndex - 1;
+      return { targetParagraphIndex: paragraphIndex, targetLineIndex: targetLine };
+      // Not the last line
+    } else if (direction === 'below' && lineIndex < initialParagraph.lines.length - 1) {
+      targetLine = lineIndex + 1;
+      return { targetParagraphIndex: paragraphIndex, targetLineIndex: targetLine };
+    }
+    // 2 - Harder case: we are at first or last line
+    if (direction === 'above') {
+      // Already at the top of the document, return current position
+      if (paragraphIndex === 0) {
+        return { targetParagraphIndex: paragraphIndex, targetLineIndex: lineIndex };
+      }
+      // Get the last line of the previous paragraph
+      targetParagraphIndex -= 1;
+      const previousParagraph = paragraphs[targetParagraphIndex];
+      targetLine = previousParagraph.lines.length - 1;
+      return { targetParagraphIndex, targetLineIndex: targetLine };
+    }
+    // direction === 'below'
+    // Already at the bottom of the document, return current position
+    if (paragraphIndex === paragraphs.length - 1) {
+      return { targetParagraphIndex: paragraphIndex, targetLineIndex: lineIndex };
+    }
+    // Get the first line of the next paragraph
+    targetLine = 0;
+    targetParagraphIndex += 1;
+
+    return { targetParagraphIndex, targetLineIndex: targetLine };
   }
 }

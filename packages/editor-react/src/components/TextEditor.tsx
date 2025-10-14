@@ -38,7 +38,7 @@ const TextEditor = ({ exportHandlers, exportEventManager }: TextEditorProps = {}
       editorHeight,
     ),
   );
-
+  
   /**
    * Initialize canvas context and editor
    */

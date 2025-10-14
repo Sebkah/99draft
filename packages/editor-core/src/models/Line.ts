@@ -1,7 +1,6 @@
 import { Editor } from '..';
 import { Run } from '../structures/Run';
 
-
 type JustifyData = {
   textTrimmed: string;
   pixelLengthTrimmed: number;
@@ -45,7 +44,8 @@ export class Line {
   private _justifyData?: JustifyData;
 
   /**
-   * Measures the pixel width of a text substring within this line while accounting for style formatting
+   * Measures the pixel width of a text substring within this line while accounting for style formatting, AND justification if applicable.
+   * This is mainly used for positioning the cursor accurately.
    * @param ctx - Canvas rendering context for text measurement
    * @param startOffset - Start offset within the line (0-based)
    * @param endOffset - End offset within the line (0-based)
@@ -62,9 +62,16 @@ export class Line {
     const paragraphStyles = this.editor.paragraphStylesManager.getParagraphStyles(
       this.parentParagraphIndex,
     );
-    if (paragraphStyles.align === 'justify' && this._justifyData) {
-      console.log(this._justifyData);
-      ctx.wordSpacing = this._justifyData.distributedSpace + 'px';
+
+    const isJustified = paragraphStyles.align === 'justify';
+
+    ctx.save();
+
+    // Console log the call stack
+    console.log(new Error().stack);
+
+    if (isJustified) {
+      ctx.wordSpacing = this.getjustifyData(ctx).distributedSpace + 'px';
     }
 
     // Measure text segments with proper formatting
@@ -81,17 +88,63 @@ export class Line {
           ctx.font = '16px Arial';
         }
 
-        const runText = this.text.substring(runStart, runEnd);
+        let runText = this.text.substring(runStart, runEnd);
+
+        if (runStart === 0 && isJustified) {
+          runText = runText.trimStart();
+        }
+        if (runEnd === this.text.length && isJustified) {
+          runText = runText.trimEnd();
+        }
+
         totalWidth += ctx.measureText(runText).width;
       }
     }
+    ctx.restore();
 
     return totalWidth;
   }
 
-  /** Gets justification data, cache it   */
+  /** Internal helper to measure text without justification (used for trimmed text measurement) */
+  private measureTextWithStyleInternal(
+    ctx: CanvasRenderingContext2D,
+    startOffset: number,
+    endOffset: number,
+  ): number {
+    let totalWidth = 0;
+
+    ctx.save();
+    // Measure text segments with proper formatting
+    for (const styleRun of this.styleRuns) {
+      // Calculate intersection of style run with the text range we want to measure
+      const runStart = Math.max(styleRun.start, startOffset);
+      const runEnd = Math.min(styleRun.end, endOffset);
+
+      if (runStart < runEnd) {
+        // Set appropriate font for this style run
+        if (styleRun.data.bold) {
+          ctx.font = 'bold 16px Arial';
+        } else {
+          ctx.font = '16px Arial';
+        }
+
+        let runText = this.text.substring(runStart, runEnd);
+
+        totalWidth += ctx.measureText(runText).width;
+      }
+    }
+    ctx.restore();
+    return totalWidth;
+  }
+
+  /** Gets justification data, cache it. This is called by the renderer directly, so we don't waste time doing it for paragraphs that don't need it
+   * XXX: maybe this is overcomplicated and we should imperatively calculate this data when the margin/width changes instead of on render?
+   *      it caused a problem when trying to update the cursor position when changing margins because the justification data wasn't calculated yet. And you can't
+   *      use this function direclty in measureTextWithStylesInternal because it would cause infinite recursion. (that's why we have a separate internal measurement function)
+   */
   getjustifyData(ctx: CanvasRenderingContext2D): JustifyData {
     if (this._justifyData === undefined) {
+      console.log('Calculating justification data for line:');
       const textTrimmed = this.text.trim();
 
       // Calculate accurate pixel length accounting for mixed formatting
@@ -102,7 +155,7 @@ export class Line {
       const trimEndOffset = trimStartOffset + textTrimmed.length;
 
       // Use the helper method to measure the trimmed text with proper formatting
-      pixelLengthTrimmed = this.measureTextWithStyles(ctx, trimStartOffset, trimEndOffset);
+      pixelLengthTrimmed = this.measureTextWithStyleInternal(ctx, trimStartOffset, trimEndOffset);
 
       // Count spaces only in trimmed text to avoid including trailing spaces in calculation
       const spaceCount = (textTrimmed.match(/ /g) || []).length;

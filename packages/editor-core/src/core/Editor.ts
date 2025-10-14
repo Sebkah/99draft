@@ -11,6 +11,7 @@ import { StylesManager } from '../styles/StylesManager';
 import { EventEmitter } from '../utils/EventEmitter';
 import type { EditorEvents, DebugUpdateEvent } from '../types/EditorEvents';
 import { Run } from '../structures/Run';
+import { debounce } from '../utils/debounce';
 
 /**
  * Type definition for debugging piece table structure
@@ -203,7 +204,7 @@ export class Editor extends EventEmitter<EditorEvents> {
     if (!canvases || canvases.length === 0) return;
 
     // Filter out null canvas elements that may exist when page count decreases
-    const validCanvases = canvases.filter((canvas): canvas is HTMLCanvasElement => canvas !== null); 
+    const validCanvases = canvases.filter((canvas): canvas is HTMLCanvasElement => canvas !== null);
 
     const ctxs = validCanvases
       .map((canvas) => canvas.getContext('2d'))
@@ -265,8 +266,8 @@ export class Editor extends EventEmitter<EditorEvents> {
     this.updateMargins();
   }
 
-  setMarginsForCurrentParagraph(marginLeft: number, marginRight: number): void {
-    const { paragraphIndex } = this.cursorManager.structurePosition;
+  setMarginsForCurrentParagraphInternal(marginLeft: number, marginRight: number): void {
+    const { paragraphIndex } = this.cursorManager.structurePosition;  
 
     this.paragraphStylesManager.setParagraphStylesPartial(paragraphIndex, {
       marginLeft,
@@ -280,6 +281,11 @@ export class Editor extends EventEmitter<EditorEvents> {
     this.cursorManager.mapLinearToStructure();
     this.renderPages();
   }
+
+  public setMarginsForCurrentParagraph = debounce(
+    this.setMarginsForCurrentParagraphInternal.bind(this),
+    5,
+  );
 
   setLineHeightForCurrentParagraph(lineHeight: number): void {
     const { paragraphIndex } = this.cursorManager.structurePosition;
