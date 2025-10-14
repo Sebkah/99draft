@@ -3,7 +3,6 @@ import { TextParser } from '../core/TextParser';
 import { EventEmitter } from '../utils/EventEmitter';
 import type { CursorManagerEvents, CursorChangeEvent } from '../types/CursorEvents';
 import type { SelectionManager } from './SelectionManager';
-import { ParagraphStyle } from '../styles/ParagraphStylesManager';
 
 export type StructurePosition = {
   pageIndex: number;
@@ -216,13 +215,8 @@ export class CursorManager extends EventEmitter<CursorManagerEvents> {
       const line = paragraph.lines[lineIndex];
       const positionInLine = cursorOffsetInParagraph - line.offsetInParagraph;
 
-      // Ensure positionInLine doesn't exceed the line length (safety check)
-      const clampedPositionInLine = Math.min(positionInLine, line.text.length);
-
-      const textBeforeCursor = line.text.substring(0, clampedPositionInLine);
-      const metrics = this.measureText(textBeforeCursor);
-      structurePosition.characterIndex = clampedPositionInLine; // Character index within the line
-      structurePosition.pixelOffsetInLine = metrics.width; // Offset in pixels within the line
+      structurePosition.characterIndex = positionInLine; // Character index within the line
+      structurePosition.pixelOffsetInLine = line.measureTextWithStyles(this.ctx, 0, positionInLine); // Offset in pixels within the line
     }
 
     // 4. Determine the page index

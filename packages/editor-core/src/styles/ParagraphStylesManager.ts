@@ -5,7 +5,7 @@ export type ParagraphStyle = {
   marginLeft: number;
   marginRight: number;
   align: 'left' | 'center' | 'right' | 'justify';
-  lineHeight?: number;
+  lineHeight: number;
 };
 
 export class ParagraphStylesManager extends EventEmitter<ParagraphStylesManagerEvents> {
@@ -41,7 +41,7 @@ export class ParagraphStylesManager extends EventEmitter<ParagraphStylesManagerE
         marginLeft: customStyles.marginLeft ?? this.editor.margins.left,
         marginRight: customStyles.marginRight ?? this.editor.margins.right,
         align: customStyles.align ?? 'left',
-        lineHeight: customStyles.lineHeight ?? 1.2,
+        lineHeight: customStyles.lineHeight ? customStyles.lineHeight * 20 : 20,
       };
     }
 
@@ -50,7 +50,7 @@ export class ParagraphStylesManager extends EventEmitter<ParagraphStylesManagerE
       marginLeft: this.editor.margins.left,
       marginRight: this.editor.margins.right,
       align: 'left',
-      lineHeight: 1.2,
+      lineHeight: 20,
     };
   }
 
@@ -69,7 +69,6 @@ export class ParagraphStylesManager extends EventEmitter<ParagraphStylesManagerE
       const existingStyles = this.styles[paragraphIndex] || {};
       this.styles[paragraphIndex] = { ...existingStyles, ...styles };
 
-      
       // Emit event for any listeners (e.g. UI updates)
       if (styles.align) {
         this.emit('paragraphAlignChange', {

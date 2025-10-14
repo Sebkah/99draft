@@ -150,29 +150,29 @@ export class Editor extends EventEmitter<EditorEvents> {
       {
         marginLeft: 45,
         marginRight: 20,
-        lineHeight: 1.2,
+        lineHeight: 1.0,
       },
       {
         marginLeft: 20,
         marginRight: 200,
-        lineHeight: 1.5,
+        lineHeight: 1.0,
       },
       {
         marginLeft: 20,
         marginRight: 300,
-        lineHeight: 1.5,
+        lineHeight: 1.0,
         align: 'left',
       },
       {
         marginLeft: 20,
         marginRight: 300,
-        lineHeight: 1.5,
+        lineHeight: 1.0,
         align: 'justify',
       },
       {
         marginLeft: 100,
         marginRight: 100,
-        lineHeight: 1.5,
+        lineHeight: 1.0,
         align: 'right',
       },
     ]);
@@ -289,6 +289,15 @@ export class Editor extends EventEmitter<EditorEvents> {
     this.textParser.splitParagraphsIntoPages();
 
     this.cursorManager.mapLinearToStructure();
+    this.renderPages();
+  }
+
+  setLineHeightForCurrentParagraph(lineHeight: number): void {
+    const { paragraphIndex } = this.cursorManager.structurePosition;
+    this.paragraphStylesManager.setParagraphStylesPartial(paragraphIndex, {
+      lineHeight: lineHeight,
+    });
+    this.textParser.splitParagraphsIntoPages();
     this.renderPages();
   }
 
@@ -533,7 +542,7 @@ export class Editor extends EventEmitter<EditorEvents> {
    * Insert text at cursor position or specified position
    * Handles multi-line text and triggers rerender after insertion
    * @param text - Text to insert (can contain newlines)
-   * @param position - Optional position to insert at (defaults to cursor position)
+   * @param position - Optional position to insert at (defaults to cursor position)   *
    */
   insertText(text: string, position?: number): void {
     const parts = text.split('\n');
@@ -640,6 +649,7 @@ export class Editor extends EventEmitter<EditorEvents> {
    * Used by other operations that will handle rendering themselves
    * Note: Does NOT update page structure - caller must call splitParagraphsIntoPages()
    * @returns true if selection was deleted, false if no selection existed
+   *
    */
   private deleteSelectionInternal(): boolean {
     const selection = this.selectionManager.getSelection();

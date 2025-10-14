@@ -99,6 +99,7 @@ export class TextParser extends EventEmitter<TextParserEvents> {
           line.freePixelSpace,
           line.wrappingWidth,
           styleRuns,
+          line.lineHeight,
         );
       });
 
@@ -117,108 +118,70 @@ export class TextParser extends EventEmitter<TextParserEvents> {
   public splitParagraphsIntoPages(): void {
     const pages: Page[] = [];
     const maxHeight = this.editor.wrappingHeight;
-    const lineHeight = 20; // Assuming a fixed line height for simplicity
 
-    // Early exit if no paragraphs exist
-    if (this.paragraphs.length === 0) {
-      this.pages = [];
-      return;
-    }
+    let currentHeight = 0;
+    // Page constructor: (startParagraphIdx, endParagraphIdx, startLineIdx, endLineIdx)
+    let currentPage = new Page(0, 0, 0, 0);
+    pages.push(currentPage);
 
-    // Calculate how many lines can fit on a single page
-    const maxLinesPerPage = Math.floor(maxHeight / lineHeight);
+    for (let i = 0; i < this.paragraphs.length; i++) {
+      const paragraph = this.paragraphs[i];
+      const { lineHeight } = this.editor.paragraphStylesManager.getParagraphStyles(i);
 
-    // If a page can't even fit a single line, we have a problem
-    if (maxLinesPerPage < 1) {
-      console.warn('Page height too small to fit even one line');
-      this.pages = [];
-      return;
-    }
+      // Calculate total height of this paragraph
+      const paragraphHeight = paragraph.lines.length * lineHeight;
 
-    let currentPage: Page | undefined = undefined; // Current page being built
-    let currentNumberOfLines = 0; // Lines already used in current page
+      // Case 1: Paragraph fits entirely in the current page
+      if (currentHeight + paragraphHeight <= maxHeight) {
+        currentPage.endParagraphIdx = i;
+        currentPage.endLineIdx = paragraph.lines.length - 1;
+        currentHeight += paragraphHeight;
+      } else {
+        // Case 2: Paragraph needs to be split across multiple pages
+        let currentLineInParagraph = 0;
 
-    // Iterate through all paragraphs to distribute them across pages
-    for (let pIndex = 0; pIndex < this.paragraphs.length; pIndex++) {
-      const paragraph = this.paragraphs[pIndex];
+        while (currentLineInParagraph < paragraph.lines.length) {
+          const remainingHeight = maxHeight - currentHeight;
+          const linesThatFit = Math.floor(remainingHeight / lineHeight);
 
-      // Skip empty paragraphs (paragraphs with no lines)
-      if (paragraph.lines.length === 0) {
-        this.editor.logger.pageManagement(
-          `Skipping empty paragraph ${pIndex} with ${paragraph.lines.length} lines`,
-        );
-        continue;
-      }
-
-      this.editor.logger.pageManagement(
-        `Processing paragraph ${pIndex} with ${paragraph.lines.length} lines`,
-      );
-
-      let remainingLinesInParagraph = paragraph.lines.length;
-
-      // Process all lines in the current paragraph, potentially across multiple pages
-      while (remainingLinesInParagraph > 0) {
-        const numberOfFreeLines = maxLinesPerPage - currentNumberOfLines;
-
-        // Calculate the current line index within the paragraph based on remaining lines
-        const currentLineIndexInParagraph = paragraph.lines.length - remainingLinesInParagraph;
-
-        // Case 1: The remaining lines of the paragraph fit entirely on the current page
-        if (remainingLinesInParagraph <= numberOfFreeLines) {
-          // If there's no current page, start a new one with this paragraph
-          if (!currentPage) {
-            const endLineIndex = currentLineIndexInParagraph + remainingLinesInParagraph - 1;
-            this.editor.logger.pageManagement(
-              `Creating new page: P${pIndex}:L${currentLineIndexInParagraph} -> P${pIndex}:L${endLineIndex}`,
-            );
-            currentPage = new Page(pIndex, pIndex, currentLineIndexInParagraph, endLineIndex);
+          if (linesThatFit <= 0) {
+            // No space left on current page - create a new page
+            // The new page will start with the line we're currently trying to place
+            // Page constructor params: (startParagraphIdx, endParagraphIdx,  startLineIdx, , endLineIdx)
+            currentPage = new Page(i, i, currentLineInParagraph, currentLineInParagraph);
             pages.push(currentPage);
-          }
-          // Extend the current page to include this paragraph
-          else {
-            const endLineIndex = currentLineIndexInParagraph + remainingLinesInParagraph - 1;
-            this.editor.logger.pageManagement(`Extending page to: P${pIndex}:L${endLineIndex}`);
-            currentPage.extendTo(pIndex, endLineIndex);
+            currentHeight = 0;
+            // Recalculate on the fresh page
+            continue;
           }
 
-          // Update counters - all remaining lines are now accounted for
-          currentNumberOfLines += remainingLinesInParagraph;
-          remainingLinesInParagraph = 0;
-        }
-        // Case 2: The paragraph has more lines than can fit on the current page
-        else {
-          // If there's no current page, start a new one
-          if (!currentPage) {
-            currentPage = new Page(
-              pIndex,
-              pIndex,
-              currentLineIndexInParagraph,
-              currentLineIndexInParagraph + numberOfFreeLines - 1,
-            );
-            pages.push(currentPage);
-          }
-          // Extend the current page to fill it completely
-          else {
-            currentPage.extendTo(pIndex, currentLineIndexInParagraph + numberOfFreeLines - 1);
+          // Calculate how many lines we can add to the current page
+          const linesToAdd = Math.min(
+            linesThatFit,
+            paragraph.lines.length - currentLineInParagraph,
+          );
+
+          // Update the current page's end position to include the lines we're adding
+          currentPage.endParagraphIdx = i;
+          currentPage.endLineIdx = currentLineInParagraph + linesToAdd - 1;
+
+          // Update tracking variables
+          currentHeight += linesToAdd * lineHeight;
+          currentLineInParagraph += linesToAdd;
+
+          // If we've placed all lines from this paragraph, we're done
+          if (currentLineInParagraph >= paragraph.lines.length) {
+            break;
           }
 
-          // Update counters for the lines we just allocated
-          currentNumberOfLines += numberOfFreeLines;
-          remainingLinesInParagraph -= numberOfFreeLines;
-
-          // Current page is now full, so we need to start a new page for remaining lines
-          currentPage = undefined;
-          currentNumberOfLines = 0;
+          // If we reach here, we've filled the current page but have more lines
+          // The next iteration will detect no space and create a new page
         }
       }
     }
 
     // Store the computed pages
     this.pages = pages;
-    this.editor.logger.pageManagement('Page splitting completed. Created', pages.length, 'pages:');
-    pages.forEach((page, index) => {
-      this.editor.logger.pageManagement(`Page ${index}:`, page.toString());
-    });
 
     // Notify about page count changes
     this.notifyPageCountChange();
@@ -383,6 +346,7 @@ export class TextParser extends EventEmitter<TextParserEvents> {
         wrappingWidth - lineWidth,
         wrappingWidth,
         styleRuns,
+        styles.lineHeight ?? 20,
       );
     };
 
@@ -459,12 +423,12 @@ export class TextParser extends EventEmitter<TextParserEvents> {
   }
 
   /**
+   * XXX: binary search
+   *
    * Locate the paragraph that contains a given character offset.
    *
-   * This function uses an inclusive model where each paragraph "owns" the position
-   * immediately after its text content (typically a newline position). This ensures
-   * there are no gaps in coverage and every valid cursor position belongs to a paragraph.
-   *
+   * This function is inclusive, where each paragraph "owns" the position
+   * immediately after its text content (the linebreak character of this paragraph).
    * See how {@link TextParser.splitIntoParagraphs} accounts for newlines when creating paragraphs.
    * See also the {@link Paragraph} type for paragraph shape and offsets.
    *
@@ -474,7 +438,6 @@ export class TextParser extends EventEmitter<TextParserEvents> {
    * @see {@link TextParser.splitIntoParagraphs}
    */
   public findParagraphIndexAtOffset(offset: number): number {
-    // Use the same logic as CursorManager.mapLinearToStructure for consistency
     for (let i = 0; i < this.paragraphs.length; i++) {
       const paragraph = this.paragraphs[i];
 
@@ -493,12 +456,12 @@ export class TextParser extends EventEmitter<TextParserEvents> {
    * It's a fast path for handling Enter key presses.
    * It updates the piece table, paragraph list, and re-parses the affected paragraphs into lines.
    *
-   *
-   *
-   *
    * @param cursorPosition - Character offset just after the newline was inserted.
    */
   public splitParagraphDirectly(cursorPosition: number): void {
+    // XXX: i wonder if we could not just reuse the logic of splitIntoParagraphs here instead of doing it that manually
+    //      like getting the full range and splitting it by linebreaks
+
     // Key implementation considerations:
     // - To reproduce the operation of splitIntoParagraphs, linebreaks need to be
     //    counted in the length but not inserted into the actual paragraph.text.
@@ -538,8 +501,6 @@ export class TextParser extends EventEmitter<TextParserEvents> {
     // New paragraph with the second part of the text, the offset is cursorPosition + 1 to account for the newline
     const newParagraph = new Paragraph(secondPartText, cursorPosition + 1);
     newParagraph.setLength(secondPartText.length + 1); // +1 for the already existing newline
-
-    /*     console.log('New paragraph created with text:', JSON.stringify(secondPartText)); */
 
     // Insert the new paragraph into the array right after the current one
     this.paragraphs.splice(paragraphIndex + 1, 0, newParagraph);
@@ -691,9 +652,5 @@ export class TextParser extends EventEmitter<TextParserEvents> {
 
     // Re-parse the merged paragraph into lines
     this.wrapParagraphLines(startParagraphIndex);
-  }
-
-  public getParagraph(index: number): Paragraph | null {
-    return this.paragraphs[index] || null;
   }
 }

@@ -33,7 +33,7 @@ const TextEditor = ({ exportHandlers, exportEventManager }: TextEditorProps = {}
   const [editor] = useState<Editor>(
     new Editor(
       baseText,
-      { left: 100, right: 200, top: 100 }, // Default margins that will be overridden by Ruler
+      { left: 100, right: 200, top: 100, bottom: 100 }, // Default margins that will be overridden by Ruler
       editorWidth,
       editorHeight,
     ),

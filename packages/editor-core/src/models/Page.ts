@@ -5,10 +5,10 @@ import { Paragraph } from './Paragraph';
  * A page spans from a starting paragraph/line to an ending paragraph/line.
  */
 export class Page {
-  private startParagraphIdx: number;
-  private endParagraphIdx: number;
-  private startLineIdx: number; // Line index within the start paragraph
-  private endLineIdx: number; // Line index within the end paragraph
+  public startParagraphIdx: number;
+  public endParagraphIdx: number;
+  public startLineIdx: number; // Line index within the start paragraph
+  public endLineIdx: number; // Line index within the end paragraph
 
   constructor(
     startParagraphIndex: number,

@@ -49,7 +49,7 @@ export class Line {
    * @param endOffset - End offset within the line (0-based)
    * @returns The accurate pixel width of the substring
    */
-  private measureTextWithStyles(
+  public measureTextWithStyles(
     ctx: CanvasRenderingContext2D,
     startOffset: number,
     endOffset: number,
@@ -128,6 +128,7 @@ export class Line {
     freePixelSpace: number,
     wrappingWidth: number,
     styleRuns: Run<Styles>[] = [],
+    public lineHeight: number,
   ) {
     this.text = text;
     this.offsetInParagraph = offsetInParagraph;
@@ -136,6 +137,7 @@ export class Line {
     this.freePixelSpace = freePixelSpace;
     this.wrappingWidth = wrappingWidth;
     this.styleRuns = styleRuns;
+    this.lineHeight = lineHeight;
   }
 
   /**

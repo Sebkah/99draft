@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, ChangeEvent } from 'react';
 import { Editor } from '@99draft/editor-core';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
@@ -27,6 +27,8 @@ const Toolbar: React.FC<ToolbarProps> = ({ editor }) => {
     'left',
   );
 
+  const [currentLineHeight, setCurrentLineHeight] = useState<number>(20);
+
   // Track active text styles
   const [activeStyles, setActiveStyles] = useState({
     bold: false,
@@ -38,13 +40,14 @@ const Toolbar: React.FC<ToolbarProps> = ({ editor }) => {
   // Update current alignment and styles when cursor position changes
   useEffect(() => {
     const updateToolbarState = () => {
-      const { align } = editor.paragraphStylesManager.getParagraphStyles(
+      const { align, lineHeight } = editor.paragraphStylesManager.getParagraphStyles(
         editor.cursorManager.structurePosition.paragraphIndex,
       );
       setCurrentAlignment(align);
 
       // Update active styles
       setActiveStyles(editor.getActiveStyles());
+      setCurrentLineHeight(lineHeight);
     };
 
     // Initial update
@@ -63,14 +66,17 @@ const Toolbar: React.FC<ToolbarProps> = ({ editor }) => {
   // Update toolbar state when selection changes
   useEffect(() => {
     const updateToolbarState = () => {
+      // XXX: need to handle that correctly when selection spans multiple paragraphs
+
       // Update active styles based on current selection or cursor position
       setActiveStyles(editor.getActiveStyles());
 
       // Update alignment based on current paragraph
-      const { align } = editor.paragraphStylesManager.getParagraphStyles(
+      const { align, lineHeight } = editor.paragraphStylesManager.getParagraphStyles(
         editor.cursorManager.structurePosition.paragraphIndex,
       );
       setCurrentAlignment(align);
+      setCurrentLineHeight(lineHeight);
     };
 
     // Subscribe to selection changes
@@ -218,7 +224,89 @@ const Toolbar: React.FC<ToolbarProps> = ({ editor }) => {
       <AlignmentButton alignment="right" icon={faAlignRight} title="Align Right" />
 
       <AlignmentButton alignment="justify" icon={faAlignJustify} title="Justify" />
+
+      {/* Separator */}
+      <div className="w-px h-6 bg-gray-300 mx-1" />
+
+      {/* Line height dropdown */}
+      <LineHeightDropDown editor={editor} />
     </div>
+  );
+};
+
+type LineHeightDropDownProps = {
+  editor: Editor;
+};
+
+const LineHeightDropDown = ({ editor }: LineHeightDropDownProps) => {
+  const [lineHeight, setCurrentLineHeight] = useState(1);
+
+  useEffect(() => {
+    const updateToolbarState = () => {
+      const { lineHeight } = editor.paragraphStylesManager.getParagraphStyles(
+        editor.cursorManager.structurePosition.paragraphIndex,
+      );
+
+      setCurrentLineHeight(lineHeight);
+    };
+
+    // Initial update
+    updateToolbarState();
+
+    // Subscribe to cursor changes
+    const unsubscribe = editor.cursorManager.on('cursorChange', () => {
+      updateToolbarState();
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, [editor]);
+
+  // Update toolbar state when selection changes
+  useEffect(() => {
+    const updateToolbarState = () => {
+      // XXX: need to handle that correctly when selection spans multiple paragraphs
+
+      // Update alignment based on current paragraph
+      const { lineHeight } = editor.paragraphStylesManager.getParagraphStyles(
+        editor.cursorManager.structurePosition.paragraphIndex,
+      );
+      setCurrentLineHeight(lineHeight);
+    };
+
+    // Subscribe to selection changes
+    const unsubscribe = editor.selectionManager.on('selectionChange', () => {
+      updateToolbarState();
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, [editor]);
+
+  return (
+    <select
+      className="ml-2 px-2 py-1 border border-gray-300 rounded-md pointer-events-auto focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1"
+      value={
+        editor.paragraphStylesManager.getParagraphStyles(
+          editor.cursorManager.structurePosition.paragraphIndex,
+        ).lineHeight / 20
+      }
+      // onChange={(e) => setCurrentLineHeight(parseInt(e.target.value, 10))}
+      title="Line Height"
+      onChange={(e: ChangeEvent<HTMLSelectElement>) => {
+        const newValue = parseFloat(e.target.value);
+        setCurrentLineHeight(newValue);
+        editor.setLineHeightForCurrentParagraph(newValue); // Convert back to pixel value
+      }}
+    >
+      <option value={1}>1.0</option>
+      <option value={1.15}>1.15</option>
+      <option value={1.5}>1.5</option>
+      <option value={2}>2.0</option>
+      <option value={3}>3.0</option>
+    </select>
   );
 };
 

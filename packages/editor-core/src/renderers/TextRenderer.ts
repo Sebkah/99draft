@@ -381,10 +381,9 @@ export class TextRenderer {
       const paragraph = allParagraphs[i];
       const styles = this.editor.paragraphStylesManager.getParagraphStyles(i);
 
-      const { align, marginLeft } = styles;
+      const { align, marginLeft, lineHeight } = styles;
 
       paragraph.lines.forEach((line, lindex) => {
-        ctx.translate(0, lineHeight);
         // Only render lines within the page's line range
         if (
           (i === page.startParagraphIndex && lindex < startLineIndex) ||
@@ -392,6 +391,8 @@ export class TextRenderer {
         ) {
           return;
         }
+
+        ctx.translate(0, lineHeight);
 
         const isLastLine = lindex === paragraph.lines.length - 1;
 
