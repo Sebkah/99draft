@@ -42,8 +42,6 @@ export class TextParser extends EventEmitter<TextParserEvents> {
   private notifyPageCountChange(): void {
     const currentPageCount = this.pages.length;
     if (this.lastPageCount !== currentPageCount) {
-
-
       const event: PageCountChangeEvent = {
         pageCount: currentPageCount,
         previousPageCount: this.lastPageCount,
@@ -95,6 +93,8 @@ export class TextParser extends EventEmitter<TextParserEvents> {
           line.wrappingWidth,
           styleRuns,
           line.lineHeight,
+          pIndex,
+          this.editor,
         );
       });
 
@@ -342,6 +342,8 @@ export class TextParser extends EventEmitter<TextParserEvents> {
         wrappingWidth,
         styleRuns,
         styles.lineHeight ?? 20,
+        paragraphIndex,
+        this.editor,
       );
     };
 

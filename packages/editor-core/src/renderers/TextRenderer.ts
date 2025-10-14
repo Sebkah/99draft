@@ -357,7 +357,6 @@ export class TextRenderer {
 
     if (!ctx) return;
 
-    const lineHeight = 20; // Height of each line
     ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
 
     ctx.save();

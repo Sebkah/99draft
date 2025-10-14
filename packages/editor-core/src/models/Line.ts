@@ -1,4 +1,6 @@
+import { Editor } from '..';
 import { Run } from '../structures/Run';
+
 
 type JustifyData = {
   textTrimmed: string;
@@ -55,6 +57,15 @@ export class Line {
     endOffset: number,
   ): number {
     let totalWidth = 0;
+
+    // Get the paragraph-styles that affect text measurement (e.g. bold)
+    const paragraphStyles = this.editor.paragraphStylesManager.getParagraphStyles(
+      this.parentParagraphIndex,
+    );
+    if (paragraphStyles.align === 'justify' && this._justifyData) {
+      console.log(this._justifyData);
+      ctx.wordSpacing = this._justifyData.distributedSpace + 'px';
+    }
 
     // Measure text segments with proper formatting
     for (const styleRun of this.styleRuns) {
@@ -129,6 +140,8 @@ export class Line {
     wrappingWidth: number,
     styleRuns: Run<Styles>[] = [],
     public lineHeight: number,
+    private parentParagraphIndex: number,
+    private editor: Editor,
   ) {
     this.text = text;
     this.offsetInParagraph = offsetInParagraph;
@@ -138,6 +151,8 @@ export class Line {
     this.wrappingWidth = wrappingWidth;
     this.styleRuns = styleRuns;
     this.lineHeight = lineHeight;
+    this.parentParagraphIndex = parentParagraphIndex;
+    this.editor = editor;
   }
 
   /**

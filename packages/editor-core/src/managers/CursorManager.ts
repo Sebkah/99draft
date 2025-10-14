@@ -289,8 +289,7 @@ export class CursorManager extends EventEmitter<CursorManagerEvents> {
         let charIndex = 0;
         let currentWidth = 0;
         for (let i = 0; i < line.text.length; i++) {
-          const char = line.text[i];
-          const charWidth = this.measureText(char).width;
+          const charWidth = line.measureTextWithStyles(this.ctx, i, i + 1);
           if (currentWidth + charWidth / 2 >= adjustedX) {
             break;
           }
@@ -452,8 +451,7 @@ export class CursorManager extends EventEmitter<CursorManagerEvents> {
 
     // Add characters one by one until we reach or exceed the pixelOffset
     for (let i = 0; i < line.text.length; i++) {
-      const char = line.text[i];
-      const charWidth = this.measureText(char).width;
+      const charWidth = line.measureTextWithStyles(this.ctx, i, i + 1);
       const nextAccumulatedWidth = accumulatedWidth + charWidth;
 
       if (nextAccumulatedWidth > pixelOffsetInLine) {
@@ -534,9 +532,6 @@ export class CursorManager extends EventEmitter<CursorManagerEvents> {
       console.log(
         `Moving cursor ${direction} to paragraph ${targetParagraphIndex}, line ${targetLine}, char ${charIndex} (page ${newPageIndex})`,
       );
-
-      // log line text
-      console.log('Line text:', JSON.stringify(line.text));
 
       const previousPosition = this.linearPosition;
       this.structurePosition = {

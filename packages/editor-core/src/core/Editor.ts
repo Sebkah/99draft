@@ -87,7 +87,6 @@ export class Editor extends EventEmitter<EditorEvents> {
   };
   public debugConfig: DebugConfig;
 
-
   public internalCanvas: HTMLCanvasElement;
 
   public get numberOfPages(): number {
@@ -140,7 +139,6 @@ export class Editor extends EventEmitter<EditorEvents> {
 
     // Initialize logger with access to debug config
 
-
     // Initialize piece table with provided text and logger
     this.pieceTable = new PieceTable(initialText);
 
@@ -161,7 +159,7 @@ export class Editor extends EventEmitter<EditorEvents> {
         marginLeft: 20,
         marginRight: 300,
         lineHeight: 1.0,
-        align: 'left',
+        align: 'justify',
       },
       {
         marginLeft: 20,
@@ -205,10 +203,7 @@ export class Editor extends EventEmitter<EditorEvents> {
     if (!canvases || canvases.length === 0) return;
 
     // Filter out null canvas elements that may exist when page count decreases
-    const validCanvases = canvases.filter((canvas): canvas is HTMLCanvasElement => canvas !== null);
-
-    const operation = skipMarginsUpdate ? 'Re-linking' : 'Linking';
-
+    const validCanvases = canvases.filter((canvas): canvas is HTMLCanvasElement => canvas !== null); 
 
     const ctxs = validCanvases
       .map((canvas) => canvas.getContext('2d'))
