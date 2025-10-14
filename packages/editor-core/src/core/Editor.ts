@@ -4,7 +4,7 @@ import { InputManager } from '../managers/InputManager';
 import { TextParser } from './TextParser';
 import { CursorManager, MousePosition } from '../managers/CursorManager';
 import { SelectionManager } from '../managers/SelectionManager';
-import { createEditorLogger, type EditorLogger } from '../managers/EditorLogger';
+
 import { TextRenderer, PDFRenderer, DOCXRenderer } from '..';
 import { ParagraphStylesManager } from '../styles/ParagraphStylesManager';
 import { StylesManager } from '../styles/StylesManager';
@@ -86,7 +86,7 @@ export class Editor extends EventEmitter<EditorEvents> {
     bottom: 50,
   };
   public debugConfig: DebugConfig;
-  public logger: EditorLogger;
+
 
   public internalCanvas: HTMLCanvasElement;
 
@@ -139,10 +139,10 @@ export class Editor extends EventEmitter<EditorEvents> {
     };
 
     // Initialize logger with access to debug config
-    this.logger = createEditorLogger(() => this.debugConfig);
+
 
     // Initialize piece table with provided text and logger
-    this.pieceTable = new PieceTable(initialText, this.logger);
+    this.pieceTable = new PieceTable(initialText);
 
     // Initialize text renderer and input manager
     this.stylesManager = new StylesManager(this, [new Run(0, 740, { bold: true })]);
@@ -208,13 +208,7 @@ export class Editor extends EventEmitter<EditorEvents> {
     const validCanvases = canvases.filter((canvas): canvas is HTMLCanvasElement => canvas !== null);
 
     const operation = skipMarginsUpdate ? 'Re-linking' : 'Linking';
-    this.logger.canvasLinking(
-      `${operation} canvases:`,
-      validCanvases.length,
-      'valid canvases for',
-      this.numberOfPages,
-      'pages',
-    );
+
 
     const ctxs = validCanvases
       .map((canvas) => canvas.getContext('2d'))

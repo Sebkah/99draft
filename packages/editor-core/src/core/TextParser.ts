@@ -42,12 +42,7 @@ export class TextParser extends EventEmitter<TextParserEvents> {
   private notifyPageCountChange(): void {
     const currentPageCount = this.pages.length;
     if (this.lastPageCount !== currentPageCount) {
-      this.editor.logger.pageManagement(
-        'Page count changed:',
-        this.lastPageCount,
-        '->',
-        currentPageCount,
-      );
+
 
       const event: PageCountChangeEvent = {
         pageCount: currentPageCount,

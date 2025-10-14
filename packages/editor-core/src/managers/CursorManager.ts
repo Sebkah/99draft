@@ -357,10 +357,6 @@ export class CursorManager extends EventEmitter<CursorManagerEvents> {
     const { paragraphIndex, lineIndex, pixelOffsetInLine } = this.structurePosition;
 
     if (paragraphIndex === -1 || lineIndex === -1 || pixelOffsetInLine === -1) {
-      this.editor.logger.cursorOperations(
-        'getLineAdjacentCursorPosition - Invalid cursor position structure:',
-        this.structurePosition,
-      );
       return cursorPosition;
     }
 

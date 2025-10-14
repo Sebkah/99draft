@@ -369,7 +369,7 @@ export class TextRenderer {
 
     const page = pages[pageIndex];
     if (!page) {
-      this.editor.logger.warn('rendering', `No page data available for page ${pageIndex}`);
+
       return;
     }
 

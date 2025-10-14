@@ -30,10 +30,6 @@ export type { TextParserEvents } from './types/TextParserEvents';
 // Input handling
 export { InputManager } from './managers/InputManager';
 
-// Logging
-export { createEditorLogger } from './managers/EditorLogger';
-export type { EditorLogger } from './managers/EditorLogger';
-
 // Page management
 export { Page } from './models/Page';
 export { Paragraph } from './models/Paragraph';
