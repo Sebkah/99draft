@@ -361,11 +361,11 @@ export class Editor extends EventEmitter<EditorEvents> {
 
       // If style change affects line breaks, we may need to re-split paragraphs into lines/pages
       if (style === 'bold') {
-        // Reparse all afected paragraphs to account for potential line break changes
+        // Reparse all affected paragraphs to account for potential line break changes
         const startParagraphIndex = this.textParser.findParagraphIndexAtOffset(styleStart);
         const endParagraphIndex = this.textParser.findParagraphIndexAtOffset(styleEnd);
         for (let i = startParagraphIndex; i <= endParagraphIndex; i++) {
-          this.textParser.splitAllParagraphsIntoLines();
+          this.textParser.wrapParagraphLines(i);
         }
 
         this.textParser.splitParagraphsIntoPages();
@@ -573,6 +573,7 @@ export class Editor extends EventEmitter<EditorEvents> {
     // Single line insertion
     this.insertTextInternal(text, position);
     // Update page structure before rendering
+    // XXX: should only re-split if the number of lines changed
     this.textParser.splitParagraphsIntoPages();
     this.renderPages();
     this.emitDebugUpdate();
