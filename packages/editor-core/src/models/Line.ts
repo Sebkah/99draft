@@ -1,18 +1,12 @@
 import { Editor } from '..';
 import { Run } from '../structures/Run';
+import { Styles } from '../styles/StylesManager';
 
 type JustifyData = {
   textTrimmed: string;
   pixelLengthTrimmed: number;
   spaceCount: number;
   distributedSpace: number;
-};
-
-type Styles = {
-  bold?: boolean;
-  italic?: boolean;
-  underline?: boolean;
-  strikethrough?: boolean;
 };
 
 /**

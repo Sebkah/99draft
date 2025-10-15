@@ -344,6 +344,36 @@ export class Editor extends EventEmitter<EditorEvents> {
   }
 
   /**
+   * Set color for the current selection or at cursor position
+   * @param color - The color value (e.g., "#FF0000" or "red")
+   */
+  setColor(color: string): void {
+    const selection = this.selectionManager.getSelection();
+    let styleStart: number;
+    let styleEnd: number;
+
+    if (selection) {
+      // Apply color to selection
+      styleStart = selection.start;
+      styleEnd = selection.end;
+      this.stylesManager.setValue('color', styleStart, styleEnd, color);
+
+      // If color change affects line breaks, we may need to re-split paragraphs into lines/pages
+      // For now, assume color doesn't affect layout
+      this.textParser.updateCachedStyleRuns(styleStart, styleEnd);
+
+      this.renderPages();
+    } else {
+      // For cursor position, set pending color (though this might not make sense for colors)
+      // For now, just apply to current position
+      const position = this.cursorManager.getPosition();
+      this.stylesManager.setValue('color', position, position + 1, color);
+      this.textParser.updateCachedStyleRuns(position, position + 1);
+      this.renderPages();
+    }
+  }
+
+  /**
    * Internal method to toggle a style on the current selection or at cursor position
    * @param style - The style to toggle: 'bold', 'italic', 'underline', or 'strikethrough'
    */
@@ -389,6 +419,7 @@ export class Editor extends EventEmitter<EditorEvents> {
     italic: boolean;
     underline: boolean;
     strikethrough: boolean;
+    color?: string;
   } {
     const selection = this.selectionManager.getSelection();
 
@@ -399,6 +430,7 @@ export class Editor extends EventEmitter<EditorEvents> {
         italic: styles.italic ?? false,
         underline: styles.underline ?? false,
         strikethrough: styles.strikethrough ?? false,
+        color: styles.color,
       };
     }
 
@@ -409,6 +441,7 @@ export class Editor extends EventEmitter<EditorEvents> {
       italic: styles.italic ?? false,
       underline: styles.underline ?? false,
       strikethrough: styles.strikethrough ?? false,
+      color: styles.color,
     };
   }
 
@@ -585,6 +618,7 @@ export class Editor extends EventEmitter<EditorEvents> {
    *
    *
    * **/
+  // XXX: there's a cursor problem when deleting ahead with Delete key
   deleteTextBefore(length: number, position?: number): void {
     this.selectionManager.clearSelection();
 

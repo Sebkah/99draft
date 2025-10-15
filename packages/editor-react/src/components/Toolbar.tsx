@@ -30,11 +30,18 @@ const Toolbar: React.FC<ToolbarProps> = ({ editor }) => {
   const [currentLineHeight, setCurrentLineHeight] = useState<number>(20);
 
   // Track active text styles
-  const [activeStyles, setActiveStyles] = useState({
+  const [activeStyles, setActiveStyles] = useState<{
+    bold: boolean;
+    italic: boolean;
+    underline: boolean;
+    strikethrough: boolean;
+    color?: string;
+  }>({
     bold: false,
     italic: false,
     underline: false,
     strikethrough: false,
+    color: '#000000',
   });
 
   // Update current alignment and styles when cursor position changes
@@ -122,6 +129,17 @@ const Toolbar: React.FC<ToolbarProps> = ({ editor }) => {
     editor.toggleStrikethrough();
     setActiveStyles(editor.getActiveStyles());
   }, [editor]);
+
+  /**
+   * Handle color change
+   */
+  const handleColorChange = useCallback(
+    (color: string) => {
+      editor.setColor(color);
+      setActiveStyles(editor.getActiveStyles());
+    },
+    [editor],
+  );
 
   /**
    * Generate alignment button with active state styling
@@ -212,6 +230,24 @@ const Toolbar: React.FC<ToolbarProps> = ({ editor }) => {
         icon={faStrikethrough}
         title="Strikethrough"
       />
+
+      {/* Separator */}
+      <div className="w-px h-6 bg-gray-300 mx-1" />
+
+      {/* Color picker */}
+      <div className="flex items-center gap-1">
+        <label htmlFor="color-picker" className="text-sm text-gray-700">
+          Color:
+        </label>
+        <input
+          id="color-picker"
+          type="color"
+          value={activeStyles.color || '#000000'}
+          onChange={(e) => handleColorChange(e.target.value)}
+          className="w-8 h-8 border border-gray-300 rounded cursor-pointer"
+          title="Text Color"
+        />
+      </div>
 
       {/* Separator */}
       <div className="w-px h-6 bg-gray-300 mx-1" />

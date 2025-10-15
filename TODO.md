@@ -10,14 +10,14 @@
 
 ## 🚀 Major
 
-- correctly map cursor when align != left
-- Implement styleManager - WIIIP
-  - correclty measure text (central measuring tool in Text Parser) with styles
-  - pending styles functionnality
+
+
+- pending styles functionnality (still bugged)
 - Add partial rendering of pages
 
 ## 🐛 Bugs
 
+- there's a cursor problem when deleting ahead with Delete key
 - Fix insertion at the end of document
 - Handle end of document globally
   - Check bounds handling in piece table

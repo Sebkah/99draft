@@ -107,6 +107,11 @@ export class TextRenderer {
       const fontStyle = fontStyles.length > 0 ? fontStyles.join(' ') + ' ' : '';
       ctx.font = `${fontStyle} 16px Arial`;
 
+      // Apply text color if specified
+      if (styles?.color) {
+        ctx.fillStyle = styles.color;
+      }
+
       // Apply text decorations (underline, strikethrough)
       // We'll render the text first, then add decorations
       ctx.fillText(segment, currentX, 0);
@@ -207,12 +212,9 @@ export class TextRenderer {
 
       ctx.save();
 
-      let { text } = line;
-
       if (justified) {
-        const { distributedSpace, textTrimmed } = line.getjustifyData(ctx);
+        const { distributedSpace } = line.getjustifyData(ctx);
         ctx.wordSpacing = distributedSpace + 'px';
-        text = textTrimmed;
       }
 
       // Measure widths using the current context (which may have word spacing applied)
@@ -230,6 +232,7 @@ export class TextRenderer {
   }
 
   // Render debug information for paragraphs, lines, and cursor position
+  // @ts-ignore - Method kept for future debugging use
   private renderDebugInfo(
     ctx: CanvasRenderingContext2D,
     lineHeight: number,
