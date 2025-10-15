@@ -1,4 +1,4 @@
-import type { EditorLogger } from '../managers/EditorLogger';
+
 
 /**
  * Represents a single, contiguous piece of text from one of the buffers.
@@ -43,7 +43,7 @@ export class PieceTable {
   /**
    * Logger instance for debug output
    */
-  private logger?: EditorLogger;
+
 
   /**
    * Version counter that increments with each modification.
@@ -58,10 +58,10 @@ export class PieceTable {
    * @param originalContent The initial text of the document.
    * @param logger Optional logger for debug output.
    */
-  constructor(originalContent: string, logger?: EditorLogger) {
+  constructor(originalContent: string) {
     this.originalBuffer = originalContent;
     this.addBuffer = '';
-    this.logger = logger;
+
 
     this.documentLength = originalContent.length;
 
@@ -540,8 +540,7 @@ export class PieceTable {
     // 2. DELETE MODE: Remove the specified range, keep everything else
 
     // Case 2A: Remove the entire piece
-    if (start === 0 && end === piece.length) {
-      this.logger?.textBuffer('Deleting entire piece');
+    if (start === 0 && end === piece.length) {  
       this.pieces.splice(pieceIndex, 1);
       this.documentLength -= piece.length;
       return; // Added return to prevent fallthrough

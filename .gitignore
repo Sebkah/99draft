@@ -10,3 +10,5 @@ out
 packages/editor-react/src/compiledStyles.css
 packages/editor-core/tsconfig.tsbuildinfo
 packages/editor-core/tsconfig.tsbuildinfo
+apps/docs/public/api
+electron.vite.config.*

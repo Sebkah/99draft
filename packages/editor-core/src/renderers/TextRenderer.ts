@@ -368,7 +368,6 @@ export class TextRenderer {
 
     const page = pages[pageIndex];
     if (!page) {
-
       return;
     }
 
@@ -422,7 +421,7 @@ export class TextRenderer {
         );
 
         // Render cursor if it's in the current line and on the current page
-        this.renderCursor(pageIndex, i, lindex, marginLeft, lineHeight);
+        this.renderCursor(pageIndex, i, lindex, marginLeftAdjusted, lineHeight);
       });
     }
 

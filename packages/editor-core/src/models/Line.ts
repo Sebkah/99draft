@@ -44,7 +44,48 @@ export class Line {
   private _justifyData?: JustifyData;
 
   /**
-   * Measures the pixel width of a text substring within this line while accounting for style formatting, AND justification if applicable.
+   * Creates a new Line instance
+   *
+   * @param text - The text content of the line
+   * @param offsetInParagraph - The starting character offset relative to the paragraph
+   * @param length - The number of characters in the line
+   * @param pixelLength - The rendered pixel width of the line
+   * @param freePixelSpace - The available pixel space remaining in the line
+   * @param wrappingWidth - The wrapping width for the line
+   * @param styleRuns - Cached style runs with coordinates relative to the line start
+   */
+  constructor(
+    text: string,
+    offsetInParagraph: number,
+    length: number,
+    pixelLength: number,
+    freePixelSpace: number,
+    wrappingWidth: number,
+    styleRuns: Run<Styles>[] = [],
+    public lineHeight: number,
+    private parentParagraphIndex: number,
+    private editor: Editor,
+    public isLastLineInParagraph: boolean,
+  ) {
+    this.text = text;
+    this.offsetInParagraph = offsetInParagraph;
+    this.length = length;
+    this.pixelLength = pixelLength;
+    this.freePixelSpace = freePixelSpace;
+    this.wrappingWidth = wrappingWidth;
+    this.styleRuns = styleRuns;
+    this.lineHeight = lineHeight;
+    this.parentParagraphIndex = parentParagraphIndex;
+    this.editor = editor;
+    this.isLastLineInParagraph = isLastLineInParagraph;
+
+    if (isLastLineInParagraph) {
+      console.log('Line is last in paragraph:', this.text);
+    }
+  }
+
+  /**
+   * Measures the pixel width of a text substring within this line while accounting for style formatting, AND ALIGNMENT, AND MARGINS.
    * This is mainly used for positioning the cursor accurately.
    * @param ctx - Canvas rendering context for text measurement
    * @param startOffset - Start offset within the line (0-based)
@@ -55,6 +96,7 @@ export class Line {
     ctx: CanvasRenderingContext2D,
     startOffset: number,
     endOffset: number,
+    adjustForAlignmentAndMargin: boolean = false,
   ): number {
     let totalWidth = 0;
 
@@ -67,10 +109,16 @@ export class Line {
 
     ctx.save();
 
-    // Console log the call stack
-    console.log(new Error().stack);
+    let marginAdjustment = 0;
+    if (adjustForAlignmentAndMargin) {
+      if (paragraphStyles.align === 'center') {
+        marginAdjustment = (this.wrappingWidth - this.pixelLength) / 2;
+      } else if (paragraphStyles.align === 'right') {
+        marginAdjustment = this.wrappingWidth - this.pixelLength;
+      }
+    }
 
-    if (isJustified) {
+    if (isJustified && !this.isLastLineInParagraph) {
       ctx.wordSpacing = this.getjustifyData(ctx).distributedSpace + 'px';
     }
 
@@ -90,10 +138,10 @@ export class Line {
 
         let runText = this.text.substring(runStart, runEnd);
 
-        if (runStart === 0 && isJustified) {
+        if (runStart === 0 && isJustified && !this.isLastLineInParagraph) {
           runText = runText.trimStart();
         }
-        if (runEnd === this.text.length && isJustified) {
+        if (runEnd === this.text.length && isJustified && !this.isLastLineInParagraph) {
           runText = runText.trimEnd();
         }
 
@@ -102,7 +150,7 @@ export class Line {
     }
     ctx.restore();
 
-    return totalWidth;
+    return totalWidth + marginAdjustment;
   }
 
   /** Internal helper to measure text without justification (used for trimmed text measurement) */
@@ -171,41 +219,6 @@ export class Line {
       };
     }
     return this._justifyData;
-  }
-
-  /**
-   * Creates a new Line instance
-   *
-   * @param text - The text content of the line
-   * @param offsetInParagraph - The starting character offset relative to the paragraph
-   * @param length - The number of characters in the line
-   * @param pixelLength - The rendered pixel width of the line
-   * @param freePixelSpace - The available pixel space remaining in the line
-   * @param wrappingWidth - The wrapping width for the line
-   * @param styleRuns - Cached style runs with coordinates relative to the line start
-   */
-  constructor(
-    text: string,
-    offsetInParagraph: number,
-    length: number,
-    pixelLength: number,
-    freePixelSpace: number,
-    wrappingWidth: number,
-    styleRuns: Run<Styles>[] = [],
-    public lineHeight: number,
-    private parentParagraphIndex: number,
-    private editor: Editor,
-  ) {
-    this.text = text;
-    this.offsetInParagraph = offsetInParagraph;
-    this.length = length;
-    this.pixelLength = pixelLength;
-    this.freePixelSpace = freePixelSpace;
-    this.wrappingWidth = wrappingWidth;
-    this.styleRuns = styleRuns;
-    this.lineHeight = lineHeight;
-    this.parentParagraphIndex = parentParagraphIndex;
-    this.editor = editor;
   }
 
   /**

@@ -6,6 +6,10 @@ import { Line } from '../models/Line';
 import { EventEmitter } from '../utils/EventEmitter';
 import type { TextParserEvents, PageCountChangeEvent } from '../types/TextParserEvents';
 
+/**
+ * @group Core
+ * @category Core
+ */
 export class TextParser extends EventEmitter<TextParserEvents> {
   private pieceTable: PieceTable;
   private paragraphs: Paragraph[] = [];
@@ -95,6 +99,7 @@ export class TextParser extends EventEmitter<TextParserEvents> {
           line.lineHeight,
           pIndex,
           this.editor,
+          line.isLastLineInParagraph,
         );
       });
 
@@ -320,7 +325,12 @@ export class TextParser extends EventEmitter<TextParserEvents> {
     };
 
     // Helper function to create a line with cached style runs
-    const createLine = (lineText: string, lineOffset: number, lineWidth: number): Line => {
+    const createLine = (
+      lineText: string,
+      lineOffset: number,
+      lineWidth: number,
+      isLastLineInParagraph: boolean = false,
+    ): Line => {
       const lineLength = lineText.length;
 
       // Get the absolute offset in the document for this line
@@ -344,6 +354,7 @@ export class TextParser extends EventEmitter<TextParserEvents> {
         styles.lineHeight ?? 20,
         paragraphIndex,
         this.editor,
+        isLastLineInParagraph,
       );
     };
 
@@ -414,7 +425,7 @@ export class TextParser extends EventEmitter<TextParserEvents> {
     // Push any remaining text as the last line
     // Always ensure at least one line exists (even for empty paragraphs with just a newline)
     if (currentLine.length > 0 || lines.length === 0) {
-      lines.push(createLine(currentLine, offsetInParagraph, currentLineWidth));
+      lines.push(createLine(currentLine, offsetInParagraph, currentLineWidth, true));
     }
     paragraph.setLines(lines);
   }

@@ -208,7 +208,6 @@ export class CursorManager extends EventEmitter<CursorManagerEvents> {
 
     // 3. Calculate the offset within the line in pixels
     if (lineIndex !== -1) {
-    
       const cursorOffsetInParagraph = cursorPosition - paragraph.offset;
       const line = paragraph.lines[lineIndex];
       const positionInLine = cursorOffsetInParagraph - line.offsetInParagraph;
@@ -363,9 +362,21 @@ export class CursorManager extends EventEmitter<CursorManagerEvents> {
     // II. Calculate the character index in the target line based on pixel offset
     const targetParagraph = paragraphs[targetParagraphIndex];
     const targetLine = targetParagraph.lines[targetLineIndex];
+    const currentLine = paragraphs[paragraphIndex].lines[lineIndex];
+
+    // Get paragraph margin
+    // XXX: Handle alignment is going to be tricky here (especially when you switch from different alignments)
+    // XXX: FOR NOW IT DOESN'T WORK AT ALL
+    const targetMarginLeft = targetLine.wrappingWidth - targetLine.pixelLength;
+    const currentMarginLeft = currentLine.wrappingWidth - currentLine.pixelLength;
+    const difference = targetMarginLeft - currentMarginLeft;
+
+    let target = pixelOffsetInLine;
+    /*  if (paragraphIndex === targetParagraphIndex) {
+      target += difference; // Adjust target pixel offset for margin differences if in the same paragraph
+    } */
 
     // Explore with a binary search to find the character index that best matches the pixel offset
-
     let low = 0;
     let high = targetLine.length;
     let bestMatchIndex = 0;
@@ -374,15 +385,15 @@ export class CursorManager extends EventEmitter<CursorManagerEvents> {
     while (low <= high) {
       steps++;
       const mid = Math.floor((low + high) / 2);
-      const midPixelOffset = targetLine.measureTextWithStyles(this.ctx, 0, mid);
-      const diff = Math.abs(midPixelOffset - pixelOffsetInLine);
+      const midPixelOffset = targetLine.measureTextWithStyles(this.ctx, 0, mid, true);
+      const diff = Math.abs(midPixelOffset - target);
       if (diff < smallestDiff) {
         smallestDiff = diff;
         bestMatchIndex = mid;
       }
-      if (midPixelOffset < pixelOffsetInLine) {
+      if (midPixelOffset < target) {
         low = mid + 1;
-      } else if (midPixelOffset > pixelOffsetInLine) {
+      } else if (midPixelOffset > target) {
         high = mid - 1;
       } else {
         break; // Exact match

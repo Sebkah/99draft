@@ -53,6 +53,7 @@ type Margins = {
 };
 
 /**
+ *
  * Editor class that manages all text editing functionality
  * Coordinates between PieceTable, TextRenderer, and other subsystems
  *
@@ -65,6 +66,9 @@ type Margins = {
  *
  * Internal subsystems are kept private to maintain consistency and proper coordination.
  * Use the public managers for direct access to cursor/selection functionality.
+ *
+ * @group Core
+ * @category Core
  */
 export class Editor extends EventEmitter<EditorEvents> {
   private pieceTable: PieceTable;
@@ -267,7 +271,7 @@ export class Editor extends EventEmitter<EditorEvents> {
   }
 
   setMarginsForCurrentParagraphInternal(marginLeft: number, marginRight: number): void {
-    const { paragraphIndex } = this.cursorManager.structurePosition;  
+    const { paragraphIndex } = this.cursorManager.structurePosition;
 
     this.paragraphStylesManager.setParagraphStylesPartial(paragraphIndex, {
       marginLeft,

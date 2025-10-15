@@ -13,14 +13,18 @@
   },
   "scripts": {
     "build": "tsup",
-    "dev": "tsc --watch",
+    "dev": "concurrently \"tsc --watch\" \"pnpm run docs\"",
     "clean": "rm -rf dist",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "docs": "typedoc",
+    "docs:watch": "typedoc --watch"
   },
   "dependencies": {
     "docx": "^9.5.1"
   },
   "devDependencies": {
+    "concurrently": "^9.2.1",
+    "typedoc": "^0.28.14",
     "typescript": "^5.8.3"
   },
   "publishConfig": {
