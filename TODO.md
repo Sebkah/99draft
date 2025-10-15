@@ -6,6 +6,7 @@
 - Optimize page calculations (check offsets instead of reparsing)
 - stop the reparsing of lines when it stabilizes
 - make canvas higher DPI
+- cursor stays on the same vertical line even across empty or shorter line (preferred horizontal offset)
 
 ## 🚀 Major
 

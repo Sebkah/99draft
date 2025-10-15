@@ -92,6 +92,7 @@ export class Line {
    * @param endOffset - End offset within the line (0-based)
    * @returns The accurate pixel width of the substring
    */
+  // This doesn't handle kerning at run boundaries, is it a problem?
   public measureTextWithStyles(
     ctx: CanvasRenderingContext2D,
     startOffset: number,

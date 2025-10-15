@@ -19,6 +19,10 @@ export type MousePosition = {
   page: number;
 };
 
+/**
+ *
+ * Note: when calculating substring widths, never use accumulation of partial widths (summing widths of individual characters or small segments). Kerning and ligatures can cause significant differences in total width.
+ */
 export class CursorManager extends EventEmitter<CursorManagerEvents> {
   // Manages cursor position and movement within the editor
   private textParser: TextParser;
@@ -247,9 +251,9 @@ export class CursorManager extends EventEmitter<CursorManagerEvents> {
     // I. Find the paragraph and line at the given y coordinate
     let accumulatedHeight = this.editor.margins.top; // Start from top margin
     let paragraphFound: Paragraph | null = null;
-    let paragraphIndexFound: number | null = null;
+    let paragraphIndexFound: number = -1;
     let lineFound: Line | null = null;
-    let lineIndexFound: number | null = null;
+    let lineIndexFound: number = -1;
     //  Go through paragraphs until we find the one that contains the y coordinate
     for (let pIndex = startParagraphIndex; pIndex <= endParagraphIndex; pIndex++) {
       const paragraph = paragraphs[pIndex];
@@ -289,7 +293,8 @@ export class CursorManager extends EventEmitter<CursorManagerEvents> {
       break;
     }
 
-    if (!(lineFound && paragraphFound && paragraphIndexFound && lineIndexFound)) return undefined;
+    if (!(lineFound && paragraphFound && paragraphIndexFound != -1 && lineIndexFound != -1))
+      return undefined;
 
     // II. Find the character index in the line at the given x coordinate
     // Get paragraph alignment
@@ -305,33 +310,9 @@ export class CursorManager extends EventEmitter<CursorManagerEvents> {
     }
 
     // Binary search to find the character index that best matches the x coordinate
-    let low = 0;
-    let high = lineFound.length;
-    let bestMatchIndex = 0;
-    let smallestDiff = Infinity;
-    let steps = 0;
     const adjustedX = x - xDelta;
-    while (low <= high) {
-      steps++;
-      const mid = Math.floor((low + high) / 2);
-      const midPixelOffset = lineFound.measureTextWithStyles(this.ctx, 0, mid);
-      const diff = Math.abs(midPixelOffset - adjustedX);
-      if (diff < smallestDiff) {
-        smallestDiff = diff;
-        bestMatchIndex = mid;
-      }
-      if (midPixelOffset < adjustedX) {
-        low = mid + 1;
-      } else if (midPixelOffset > adjustedX) {
-        high = mid - 1;
-      } else {
-        break; // Exact match
-      }
-    }
-
-    console.log(`Binary search steps: ${steps}`);
-    console.log('Best match character index:', lineFound.text[bestMatchIndex], bestMatchIndex);
-    const pixelOffsetInLine = lineFound.measureTextWithStyles(this.ctx, 0, bestMatchIndex);
+    const { index: bestMatchIndex, pixelOffset: pixelOffsetInLine } =
+      this.findCharacterIndexByPixelOffset(lineFound, adjustedX);
 
     // III. Map back to linear position
     const newLinearPosition = paragraphFound.offset + lineFound.offsetInParagraph + bestMatchIndex;
@@ -394,45 +375,43 @@ export class CursorManager extends EventEmitter<CursorManagerEvents> {
     const targetLine = targetParagraph.lines[targetLineIndex];
     const currentLine = paragraphs[paragraphIndex].lines[lineIndex];
 
-    // Get paragraph margin
-    // XXX: Handle alignment is going to be tricky here (especially when you switch from different alignments)
-    // XXX: FOR NOW IT DOESN'T WORK AT ALL
-    const targetMarginLeft = targetLine.wrappingWidth - targetLine.pixelLength;
-    const currentMarginLeft = currentLine.wrappingWidth - currentLine.pixelLength;
-    const difference = targetMarginLeft - currentMarginLeft;
+    // To handle different alignments between current and target lines, we calculate the absolute pixel position
+    // of the cursor in the current line, then adjust it for the target line's alignment.
+    // pixelOffsetInLine is the pixel offset relative to the start of the text in the current line, not including margins or alignment.
+    // We compute the total x position by adding the left margin and alignment offset to get the absolute x.
 
-    let target = pixelOffsetInLine;
-    /*  if (paragraphIndex === targetParagraphIndex) {
-      target += difference; // Adjust target pixel offset for margin differences if in the same paragraph
-    } */
+    // Get current paragraph alignment and styles
+    const { align: currentAlign, marginLeft: currentMarginLeft } =
+      this.editor.paragraphStylesManager.getParagraphStyles(paragraphIndex);
+    const { freePixelSpace: currentFreePixelSpace } = currentLine;
 
-    // Explore with a binary search to find the character index that best matches the pixel offset
-    let low = 0;
-    let high = targetLine.length;
-    let bestMatchIndex = 0;
-    let smallestDiff = Infinity;
-    let steps = 0;
-    while (low <= high) {
-      steps++;
-      const mid = Math.floor((low + high) / 2);
-      const midPixelOffset = targetLine.measureTextWithStyles(this.ctx, 0, mid);
-      const diff = Math.abs(midPixelOffset - target);
-      if (diff < smallestDiff) {
-        smallestDiff = diff;
-        bestMatchIndex = mid;
-      }
-      if (midPixelOffset < target) {
-        low = mid + 1;
-      } else if (midPixelOffset > target) {
-        high = mid - 1;
-      } else {
-        break; // Exact match
-      }
+    // Calculate absolute x position for current cursor
+    let currentXDelta = currentMarginLeft;
+    if (currentAlign === 'center') {
+      currentXDelta += currentFreePixelSpace / 2;
+    } else if (currentAlign === 'right') {
+      currentXDelta += currentFreePixelSpace;
     }
+    const absoluteX = currentXDelta + pixelOffsetInLine;
 
-    console.log(`Binary search steps: ${steps}`);
+    // Get target paragraph alignment and styles
+    const { align: targetAlign, marginLeft: targetMarginLeft } =
+      this.editor.paragraphStylesManager.getParagraphStyles(targetParagraphIndex);
+    const { freePixelSpace: targetFreePixelSpace } = targetLine;
 
-    console.log('Best match character index:', targetLine.text[bestMatchIndex], bestMatchIndex);
+    // Calculate adjusted x for target line
+    // Subtract the target's alignment offset to get the pixel offset relative to the target's text start.
+    let targetXDelta = targetMarginLeft;
+    if (targetAlign === 'center') {
+      targetXDelta += targetFreePixelSpace / 2;
+    } else if (targetAlign === 'right') {
+      targetXDelta += targetFreePixelSpace;
+    }
+    const adjustedX = absoluteX - targetXDelta;
+
+    // Binary search to find the character index that best matches the adjusted x coordinate
+    const { index: bestMatchIndex, pixelOffset: newPixelOffsetInLine } =
+      this.findCharacterIndexByPixelOffset(targetLine, adjustedX);
 
     // III. Map back to linear position
     const newLinearPosition =
@@ -442,7 +421,7 @@ export class CursorManager extends EventEmitter<CursorManagerEvents> {
       paragraphIndex: targetParagraphIndex,
       lineIndex: targetLineIndex,
       characterIndex: bestMatchIndex,
-      pixelOffsetInLine: targetLine.measureTextWithStyles(this.ctx, 0, bestMatchIndex),
+      pixelOffsetInLine: newPixelOffsetInLine,
     };
 
     // Update page index in structure position
@@ -514,5 +493,46 @@ export class CursorManager extends EventEmitter<CursorManagerEvents> {
     targetParagraphIndex += 1;
 
     return { targetParagraphIndex, targetLineIndex: targetLine };
+  }
+
+  /**
+   * Finds the character index in a line that best matches a given pixel offset using binary search.
+   * This is used to determine the cursor position within a line based on horizontal pixel coordinates.
+   *
+   * @param line - The line object containing the text and measurement methods.
+   * @param targetPixelOffset - The target pixel offset from the start of the line's text.
+   * @returns An object containing the character index and the exact pixel offset of that character.
+   */
+  private findCharacterIndexByPixelOffset(
+    line: Line,
+    targetPixelOffset: number,
+  ): { index: number; pixelOffset: number } {
+    let low = 0;
+    let high = line.length;
+    let bestMatchIndex = 0;
+    let bestPixelOffset = 0;
+    let smallestDiff = Infinity;
+    let steps = 0;
+    while (low <= high) {
+      steps++;
+      const mid = Math.floor((low + high) / 2);
+      const midPixelOffset = line.measureTextWithStyles(this.ctx, 0, mid);
+      const diff = Math.abs(midPixelOffset - targetPixelOffset);
+      if (diff < smallestDiff) {
+        smallestDiff = diff;
+        bestMatchIndex = mid;
+        bestPixelOffset = midPixelOffset;
+      }
+      if (midPixelOffset < targetPixelOffset) {
+        low = mid + 1;
+      } else if (midPixelOffset > targetPixelOffset) {
+        high = mid - 1;
+      } else {
+        break; // Exact match
+      }
+    }
+    console.log(`Binary search steps: ${steps}`);
+    console.log('Best match character index:', line.text[bestMatchIndex], bestMatchIndex);
+    return { index: bestMatchIndex, pixelOffset: bestPixelOffset };
   }
 }
