@@ -216,8 +216,8 @@ export class TextRenderer {
       }
 
       // Measure widths using the current context (which may have word spacing applied)
-      const startWidth = ctx.measureText(text.substring(0, startChar)).width;
-      const endWidth = ctx.measureText(text.substring(0, endChar)).width;
+      const startWidth = line.measureTextWithStyles(ctx, 0, startChar);
+      const endWidth = line.measureTextWithStyles(ctx, 0, endChar);
 
       const rectX = adjustedLeftMargin + startWidth;
       const rectW = Math.max(1, endWidth - startWidth);

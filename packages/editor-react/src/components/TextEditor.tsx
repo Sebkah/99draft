@@ -38,7 +38,7 @@ const TextEditor = ({ exportHandlers, exportEventManager }: TextEditorProps = {}
       editorHeight,
     ),
   );
-  
+
   /**
    * Initialize canvas context and editor
    */
@@ -79,7 +79,7 @@ const TextEditor = ({ exportHandlers, exportEventManager }: TextEditorProps = {}
   return (
     <>
       {/* Main text editor canvas */}
-      <div className="relative w-full h-full overflow-y-auto bg-gray-200 flex flex-col items-center">
+      <div className="relative w-full h-full overflow-y-auto overflow-x-hidden bg-gray-200 flex flex-col items-center">
         {/* Fixed toolbar at the top */}
         <div className="fixed top-0 z-50 flex flex-col items-center gap-2 py-2">
           <Toolbar editor={editor} />

@@ -3,6 +3,7 @@ import { BooleanRunManager } from '../runManagers/BooleanRunManager';
 import { Run } from '../structures/Run';
 
 const booleanStyles = ['bold', 'italic', 'underline', 'strikethrough'] as const;
+const valueStyles = ["color"] as const
 type Style = (typeof booleanStyles)[number];
 
 type Styles = {

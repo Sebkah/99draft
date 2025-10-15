@@ -7,7 +7,7 @@ function App(): React.JSX.Element {
   const { exportHandlers, exportEventManager } = createElectronExportAdapters();
 
   return (
-    <main className="bg-black/5 w-full h-screen flex  overflow-x-hidden ">
+    <main className="h-full w-full overflow-hidden ">
       <TextEditor exportHandlers={exportHandlers} exportEventManager={exportEventManager} />
     </main>
   );
