@@ -27,6 +27,7 @@ export class ParagraphStylesManager extends EventEmitter<ParagraphStylesManagerE
   /**
    * Get styles for a paragraph at the given index.
    * Returns the custom styles if they exist, otherwise returns computed defaults.
+   * For lineHeight, converts from editor internal (0.05 to 5) to X 20.
    *
    * @param paragraphIndex - Zero-based index of the paragraph
    * @returns Complete style object with either custom or default values

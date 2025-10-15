@@ -96,7 +96,6 @@ export class Line {
     ctx: CanvasRenderingContext2D,
     startOffset: number,
     endOffset: number,
-    adjustForAlignmentAndMargin: boolean = false,
   ): number {
     let totalWidth = 0;
 
@@ -108,15 +107,6 @@ export class Line {
     const isJustified = paragraphStyles.align === 'justify';
 
     ctx.save();
-
-    let marginAdjustment = 0;
-    if (adjustForAlignmentAndMargin) {
-      if (paragraphStyles.align === 'center') {
-        marginAdjustment = (this.wrappingWidth - this.pixelLength) / 2;
-      } else if (paragraphStyles.align === 'right') {
-        marginAdjustment = this.wrappingWidth - this.pixelLength;
-      }
-    }
 
     if (isJustified && !this.isLastLineInParagraph) {
       ctx.wordSpacing = this.getjustifyData(ctx).distributedSpace + 'px';
@@ -150,7 +140,7 @@ export class Line {
     }
     ctx.restore();
 
-    return totalWidth + marginAdjustment;
+    return totalWidth;
   }
 
   /** Internal helper to measure text without justification (used for trimmed text measurement) */

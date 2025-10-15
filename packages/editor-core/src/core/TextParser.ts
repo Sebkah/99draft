@@ -25,6 +25,11 @@ export class TextParser extends EventEmitter<TextParserEvents> {
     return this.pages;
   }
 
+  public getPage(pageIndex: number): Page | null {
+    if (this.pages.length === 0) return null;
+    return this.pages[pageIndex];
+  }
+
   constructor(pieceTable: PieceTable, ctx: CanvasRenderingContext2D, editor: Editor) {
     super();
     this.pieceTable = pieceTable;
@@ -249,6 +254,8 @@ export class TextParser extends EventEmitter<TextParserEvents> {
             const lastParagraph = this.paragraphs[this.paragraphs.length - 1];
             lastParagraph.adjustLength(1); // +1 for the newline
           }
+
+       
 
           // Start a new empty paragraph
           this.paragraphs.push(new Paragraph('', currentOffset));

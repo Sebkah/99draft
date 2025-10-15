@@ -3,7 +3,7 @@ import { TextParser } from '../core/TextParser';
 import { EventEmitter } from '../utils/EventEmitter';
 import type { CursorManagerEvents, CursorChangeEvent } from '../types/CursorEvents';
 import type { SelectionManager } from './SelectionManager';
-import { Paragraph } from '..';
+import { Line, Paragraph } from '..';
 
 export type StructurePosition = {
   pageIndex: number;
@@ -238,96 +238,125 @@ export class CursorManager extends EventEmitter<CursorManagerEvents> {
     pageIndex: number,
     moveCursor: boolean = true,
   ): StructurePosition | undefined {
-    const lineHeight = 20; // Height of each line
-
-    const clickedLineInPage = Math.floor((y - this.editor.margins.top) / lineHeight);
-
-    const page = this.textParser.getPages()[pageIndex];
+    const page = this.textParser.getPage(pageIndex);
     if (!page) return undefined;
 
     const paragraphs = this.textParser.getParagraphs();
     const { startParagraphIndex, endParagraphIndex, startLineIndex, endLineIndex } = page;
 
-    // Count lines in the page to find which paragraph and line was clicked
-    let accumulatedLinesInPage = 0;
-
+    // I. Find the paragraph and line at the given y coordinate
+    let accumulatedHeight = this.editor.margins.top; // Start from top margin
+    let paragraphFound: Paragraph | null = null;
+    let paragraphIndexFound: number | null = null;
+    let lineFound: Line | null = null;
+    let lineIndexFound: number | null = null;
+    //  Go through paragraphs until we find the one that contains the y coordinate
     for (let pIndex = startParagraphIndex; pIndex <= endParagraphIndex; pIndex++) {
       const paragraph = paragraphs[pIndex];
-
-      // Paragraph margin
-      const marginLeft =
-        this.editor.paragraphStylesManager.getParagraphStyles(pIndex).marginLeft ??
-        this.editor.margins.left;
-      const adjustedX = x - marginLeft; // Adjust x for paragraph margin
-
       if (!paragraph) continue;
 
-      // Determine which lines of this paragraph are in this page
-      let firstLineInPage = 0;
-      let lastLineInPage = paragraph.lines.length - 1;
-
+      // Determine how many lines of this paragraph are in this page
+      let linesCutAtStart = 0;
+      let linesCutAtEnd = 0;
       if (pIndex === startParagraphIndex) {
-        firstLineInPage = startLineIndex;
+        linesCutAtStart += startLineIndex;
       }
       if (pIndex === endParagraphIndex) {
-        lastLineInPage = endLineIndex;
+        linesCutAtEnd += paragraph.lines.length - 1 - endLineIndex;
       }
+      const linesNotInPage = linesCutAtStart + linesCutAtEnd;
 
-      const linesInPageForThisParagraph = lastLineInPage - firstLineInPage + 1;
+      const linesInPage = paragraph.lines.length - linesNotInPage;
 
-      // Check if the clicked line is within this paragraph's lines in the page
-      if (clickedLineInPage < accumulatedLinesInPage + linesInPageForThisParagraph) {
-        const lineInParagraph = firstLineInPage + (clickedLineInPage - accumulatedLinesInPage);
-        const line = paragraph.lines[lineInParagraph];
+      // Get paragraph styles for line height
+      const { lineHeight } = this.editor.paragraphStylesManager.getParagraphStyles(pIndex);
 
-        if (!line) return undefined;
-
-        // Now find the character index in the line based on adjustedX
-        let charIndex = 0;
-        let currentWidth = 0;
-        for (let i = 0; i < line.text.length; i++) {
-          const charWidth = line.measureTextWithStyles(this.ctx, i, i + 1);
-          if (currentWidth + charWidth / 2 >= adjustedX) {
-            break;
-          }
-          currentWidth += charWidth;
-          charIndex++;
-        }
-
-        const proposed: StructurePosition = {
-          pageIndex: pageIndex,
-          paragraphIndex: pIndex,
-          lineIndex: lineInParagraph,
-          characterIndex: charIndex,
-          pixelOffsetInLine: currentWidth,
-        };
-
-        if (moveCursor) {
-          const previousPosition = this.linearPosition;
-          this.structurePosition = proposed;
-          this.linearPosition = this.mapStructureToLinear({
-            pageIndex: pageIndex,
-            paragraphIndex: pIndex,
-            lineIndex: lineInParagraph,
-            characterIndex: charIndex,
-          });
-
-          // Emit events if position changed
-          if (this.linearPosition !== previousPosition) {
-            const event: CursorChangeEvent = {
-              position: this.linearPosition,
-              structurePosition: { ...this.structurePosition },
-              previousPosition: previousPosition,
-            };
-            this.emit('cursorChange', event);
-          }
-        }
-        return proposed;
+      // Try adding the whole paragraph height at once for a quick check, accounting for cut lines (start and end)
+      const paragraphHeight = lineHeight * linesInPage;
+      // 1. Paragraph does not contain the y coordinate, skip it
+      if (accumulatedHeight + paragraphHeight < y) {
+        accumulatedHeight += paragraphHeight;
+        continue; // Not in this paragraph, skip to next
       }
-
-      accumulatedLinesInPage += linesInPageForThisParagraph;
+      // 2. Paragraph contains the y coordinate, find the exact line, accounting for cut lines (start only)
+      paragraphFound = paragraph;
+      paragraphIndexFound = pIndex;
+      const remainingY = y - accumulatedHeight + linesCutAtStart * lineHeight;
+      const lineIndexInParagraph = Math.floor(remainingY / lineHeight);
+      lineFound = paragraph.lines[lineIndexInParagraph];
+      lineIndexFound = lineIndexInParagraph;
+      console.log('Found paragraph index', pIndex, 'line index', lineIndexInParagraph);
+      break;
     }
-    return undefined;
+
+    if (!(lineFound && paragraphFound && paragraphIndexFound && lineIndexFound)) return undefined;
+
+    // II. Find the character index in the line at the given x coordinate
+    // Get paragraph alignment
+    const { align, marginLeft } =
+      this.editor.paragraphStylesManager.getParagraphStyles(paragraphIndexFound);
+    const { freePixelSpace } = lineFound;
+
+    let xDelta = marginLeft; // Start with left margin
+    if (align === 'center') {
+      xDelta += freePixelSpace / 2;
+    } else if (align === 'right') {
+      xDelta += freePixelSpace;
+    }
+
+    // Binary search to find the character index that best matches the x coordinate
+    let low = 0;
+    let high = lineFound.length;
+    let bestMatchIndex = 0;
+    let smallestDiff = Infinity;
+    let steps = 0;
+    const adjustedX = x - xDelta;
+    while (low <= high) {
+      steps++;
+      const mid = Math.floor((low + high) / 2);
+      const midPixelOffset = lineFound.measureTextWithStyles(this.ctx, 0, mid);
+      const diff = Math.abs(midPixelOffset - adjustedX);
+      if (diff < smallestDiff) {
+        smallestDiff = diff;
+        bestMatchIndex = mid;
+      }
+      if (midPixelOffset < adjustedX) {
+        low = mid + 1;
+      } else if (midPixelOffset > adjustedX) {
+        high = mid - 1;
+      } else {
+        break; // Exact match
+      }
+    }
+
+    console.log(`Binary search steps: ${steps}`);
+    console.log('Best match character index:', lineFound.text[bestMatchIndex], bestMatchIndex);
+    const pixelOffsetInLine = lineFound.measureTextWithStyles(this.ctx, 0, bestMatchIndex);
+
+    // III. Map back to linear position
+    const newLinearPosition = paragraphFound.offset + lineFound.offsetInParagraph + bestMatchIndex;
+    const newStructurePosition: StructurePosition = {
+      pageIndex: pageIndex,
+      paragraphIndex: paragraphIndexFound,
+      lineIndex: lineIndexFound,
+      characterIndex: bestMatchIndex,
+      pixelOffsetInLine: pixelOffsetInLine,
+    };
+    if (moveCursor) {
+      const previousPosition = this.linearPosition;
+      this.linearPosition = newLinearPosition;
+      this.structurePosition = newStructurePosition;
+      // Emit events if position changed
+      if (this.linearPosition !== previousPosition) {
+        const event: CursorChangeEvent = {
+          position: this.linearPosition,
+          structurePosition: { ...this.structurePosition },
+          previousPosition: previousPosition,
+        };
+        this.emit('cursorChange', event);
+      }
+    }
+    return newStructurePosition;
   }
 
   public mapStructureToLinear(structurePos: Omit<StructurePosition, 'pixelOffsetInLine'>): number {
@@ -342,6 +371,7 @@ export class CursorManager extends EventEmitter<CursorManagerEvents> {
     return targetParagraph.offset + targetLine.offsetInParagraph + characterIndex;
   }
 
+  // TODO: mapPixelCoo seems to work, trye reproducing the same thing here
   public getLineAdjacentPosition(
     direction: 'above' | 'below',
     moveCursor: boolean = true,
@@ -385,7 +415,7 @@ export class CursorManager extends EventEmitter<CursorManagerEvents> {
     while (low <= high) {
       steps++;
       const mid = Math.floor((low + high) / 2);
-      const midPixelOffset = targetLine.measureTextWithStyles(this.ctx, 0, mid, true);
+      const midPixelOffset = targetLine.measureTextWithStyles(this.ctx, 0, mid);
       const diff = Math.abs(midPixelOffset - target);
       if (diff < smallestDiff) {
         smallestDiff = diff;
